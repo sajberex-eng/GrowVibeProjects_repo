@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}График заседаний {{ commission.short_name }}{% endblock %}
+{% block content %}
+{% include "meetings/_crumbs.html" %}
+<div class="page-head"><div><h1>График заседаний на год</h1><div class="sub">{{ commission.name }}</div></div></div>
+<div class="grid-2">
+  <div class="card">
+    <h2>Правило</h2>
+    <form method="post" novalidate id="schedule-form">
+      {% csrf_token %}
+      {% include "partials/form.html" with form=form %}
+      <div class="actions">
+        <button class="btn" type="submit" name="action" value="preview">Предпросмотр</button>
+        {% if slots and to_create %}<button class="btn btn-primary" type="submit" name="action" value="create" data-confirm="Создать {{ to_create }} заседаний?">Создать {{ to_create }} заседаний</button>{% endif %}
+      </div>
+    </form>
+  </div>
+  <div class="card">
+    <h2>Предпросмотр</h2>
+    {% if slots is None %}
+      <p class="empty">Задайте правило и нажмите «Предпросмотр».</p>
+    {% else %}
+      <p class="small muted">{{ description|capfirst }} · дат: {{ slots|length }}, будет создано: {{ to_create }}</p>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Дата</th><th>Время</th><th></th></tr></thead>
+        <tbody>
+        {% for s in slots %}
+        <tr class="{% if not s.will_create %}row-muted{% endif %}"><td>{{ s.date|date:"d.m.Y, D" }}</td><td>{{ s.starts_at|local_dt:"%H:%M" }}</td>
+          <td>{% if s.exists %}{% badge "уже есть заседание" "gray" %}{% elif s.in_past %}{% badge "прошло" "gray" %}{% else %}{% badge "будет создано" "green" %}{% endif %}</td></tr>
+        {% empty %}<tr><td colspan="3" class="empty">Нет дат</td></tr>{% endfor %}
+        </tbody></table></div>
+      <p class="small muted" style="margin-top:8px">Состав комиссии получит одно уведомление о графике. Пункт «Контроль исполнения решений» добавляется в повестку за 3 дня до заседания (или кнопкой в карточке заседания).</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  var form = document.getElementById('schedule-form');
+  if (!form) return;
+  var rule = form.querySelector('[name=rule]');
+  function field(name) { var el = form.querySelector('[name=' + name + ']'); return el ? el.closest('.field') : null; }
+  function sync() {
+    var v = rule.value;
+    var weekly = v === 'nth_weekday' || v === 'quarterly';
+    [['nth', weekly], ['weekday', weekly], ['day', v === 'day_of_month'], ['quarter_month', v === 'quarterly']].forEach(function (p) {
+      var f = field(p[0]); if (f) f.style.display = p[1] ? '' : 'none';
+    });
+  }
+  rule.addEventListener('change', sync); sync();
+})();
+</script>
+{% endblock %}

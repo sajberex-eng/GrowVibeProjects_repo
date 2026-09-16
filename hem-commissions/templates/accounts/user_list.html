@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Пользователи{% endblock %}
+{% block content %}
+<div class="page-head"><h1>Пользователи</h1>
+  <div class="actions"><a class="btn btn-primary" href="{% url 'accounts:user_create' %}">+ Пользователь</a></div></div>
+<form class="filters" method="get">
+  <div class="field"><label>Поиск</label><input type="search" name="q" value="{{ q }}" placeholder="ФИО, логин, e-mail"></div>
+  <div class="field"><label>Статус</label><select name="status">
+    <option value="active" {% if status == 'active' %}selected{% endif %}>Активные</option>
+    <option value="inactive" {% if status == 'inactive' %}selected{% endif %}>Отключённые / уволенные</option>
+    <option value="all" {% if status == 'all' %}selected{% endif %}>Все</option></select></div>
+  <button class="btn" type="submit">Показать</button>
+</form>
+<div class="card"><div class="table-wrap"><table class="table">
+  <thead><tr><th>ФИО</th><th>Логин</th><th>Должность</th><th>Подразделение</th><th>Город</th><th>E-mail</th><th>Статус</th></tr></thead>
+  <tbody>
+  {% for u in page %}
+  <tr class="{% if not u.is_active %}row-muted{% endif %}">
+    <td><a href="{% url 'accounts:user_edit' u.pk %}">{{ u.full_name|default:u.username }}</a>{% if u.is_staff %} {% badge "админ" "blue" %}{% endif %}</td>
+    <td>{{ u.username }}</td><td>{{ u.position|default:"—" }}</td><td>{{ u.department|default:"—" }}</td><td>{{ u.city|default:"—" }}</td><td>{{ u.email }}</td>
+    <td>{% if u.is_locked %}{% badge "заблокирован" "red" %}{% elif u.dismissed_at %}{% badge "уволен" "gray" %}{% elif u.is_active %}{% badge "активен" "green" %}{% else %}{% badge "отключён" "gray" %}{% endif %}</td>
+  </tr>
+  {% empty %}<tr><td colspan="7" class="empty">Нет пользователей</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

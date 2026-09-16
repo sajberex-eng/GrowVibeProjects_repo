@@ -1,0 +1,66 @@
+{% load static ui %}<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Проверка протокола — Центр гематологии</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+<main class="content" style="max-width:860px;margin:0 auto">
+  <div class="page-head"><div><h1>Проверка подлинности протокола</h1>
+    <div class="sub">Информационная система «Комиссии Центра гематологии»</div></div></div>
+
+  {% if protocol.status == 'annulled' %}
+  <div class="callout danger"><b>ПРОТОКОЛ АННУЛИРОВАН</b> {{ protocol.annulled_at|local_dt }}. Документ не имеет юридической силы.</div>
+  {% endif %}
+
+  {% if not visible %}
+  <div class="callout">Документ ещё не сформирован для подписания.</div>
+  {% else %}
+  <div class="card">
+    <dl class="kv">
+      <dt>Комиссия</dt><dd>{{ protocol.commission.name }}</dd>
+      <dt>Документ</dt><dd>{{ protocol.get_kind_display }} № {{ protocol.number|default:"б/н" }}</dd>
+      <dt>Дата протокола</dt><dd>{{ protocol.protocol_date|date:"d.m.Y" }}</dd>
+      <dt>Статус</dt><dd>{% status_badge protocol %}</dd>
+      <dt>Идентификатор</dt><dd class="mono small">{{ protocol.uid }}</dd>
+      <dt>SHA-256 документа на подпись</dt><dd class="mono small">{{ protocol.frozen_hash|default:"—" }}</dd>
+      <dt>SHA-256 подписанного PDF</dt><dd class="mono small">{{ protocol.signed_hash|default:"—" }}</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Подписи</h2></div>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Подписант</th><th>Роль</th><th>Дата и время</th><th>Способ</th></tr></thead><tbody>
+      {% for s in signatures %}
+      <tr><td>{{ s.full_name }}{% if s.position_text %}<div class="small muted">{{ s.position_text }}</div>{% endif %}</td>
+        <td>{{ s.get_role_display }}</td><td class="nowrap">{{ s.signed_at|local_dt }}</td>
+        <td class="small">простая ЭП, подтверждена кодом из e-mail</td></tr>
+      {% empty %}<tr><td colspan="4" class="empty">Подписей пока нет</td></tr>{% endfor %}
+      </tbody></table></div>
+  </div>
+  {% endif %}
+
+  <div class="card">
+    <div class="card-head"><h2>Сравнить файл</h2></div>
+    <p class="small">Выберите PDF-файл протокола — система вычислит его SHA-256 и сравнит с хэшами, зафиксированными при подписании. Файл не сохраняется.</p>
+    <form method="post" enctype="multipart/form-data">{% csrf_token %}
+      {% include "partials/form.html" with form=form %}
+      <button class="btn btn-primary" type="submit">Проверить</button>
+    </form>
+    {% if result %}
+      {% if result.match == 'signed' %}
+      <div class="callout info" style="margin-top:12px"><b>Совпадает</b> с подписанным PDF{% if protocol.status == 'annulled' %}, но протокол аннулирован{% endif %}.</div>
+      {% elif result.match == 'frozen' %}
+      <div class="callout info" style="margin-top:12px"><b>Совпадает</b> с документом, направленным на подпись (без листа подписания).</div>
+      {% else %}
+      <div class="callout danger" style="margin-top:12px"><b>Не совпадает.</b> Файл отличается от зарегистрированного документа.</div>
+      {% endif %}
+      <p class="small muted">SHA-256 файла: <span class="mono">{{ result.hash }}</span></p>
+    {% endif %}
+  </div>
+</main>
+</body>
+</html>

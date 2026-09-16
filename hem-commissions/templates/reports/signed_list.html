@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Подписанные отчёты{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'reports:index' %}">Отчёты</a></div>
+<div class="page-head"><div><h1>Подписанные отчёты</h1></div></div>
+<div class="card">
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Отчёт</th><th>Подписал</th><th>Дата подписи</th><th>SHA-256</th><th></th></tr></thead>
+    <tbody>
+    {% for r in reports %}
+    <tr id="r{{ r.pk }}">
+      <td>{{ r }}</td>
+      <td>{{ r.signed_by.full_name }}</td>
+      <td class="nowrap">{{ r.signed_at|local_dt }}</td>
+      <td class="small" style="overflow-wrap:anywhere">{{ r.document_hash }}</td>
+      <td><a class="btn btn-sm" href="{% url 'reports:signed_download' r.pk %}">PDF</a></td>
+    </tr>
+    {% empty %}<tr><td colspan="5" class="empty">Подписанных отчётов нет</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

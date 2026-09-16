@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{% if obj %}{{ obj.full_name }}{% else %}Новый пользователь{% endif %}{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'accounts:user_list' %}">Пользователи</a></div>
+<div class="page-head"><h1>{% if obj %}{{ obj.full_name }}{% else %}Новый пользователь{% endif %}</h1>
+{% if obj %}<div class="actions">
+  {% if obj.is_locked %}<form class="inline" method="post" action="{% url 'accounts:user_unlock' obj.pk %}">{% csrf_token %}<button class="btn">Разблокировать</button></form>{% endif %}
+  <form class="inline" method="post" action="{% url 'accounts:user_reset_password' obj.pk %}">{% csrf_token %}<button class="btn" data-confirm="Сгенерировать новый временный пароль и отправить на {{ obj.email }}?">Сбросить пароль</button></form>
+</div>{% endif %}</div>
+<div class="card form-narrow">
+<form method="post">{% csrf_token %}
+  {% include "partials/form.html" with form=form %}
+  {% if not obj %}<p class="muted small">Временный пароль будет сгенерирован и отправлен на e-mail. При первом входе пользователь сменит его.</p>{% endif %}
+  <p class="muted small">При увольнении укажите дату — учётная запись будет отключена, история участия в комиссиях сохранится. Справочники должностей, подразделений и городов — в разделе «Справочники и шаблоны».</p>
+  <button class="btn btn-primary" type="submit">Сохранить</button>
+  <a class="btn btn-ghost" href="{% url 'accounts:user_list' %}">Отмена</a>
+</form></div>
+{% endblock %}

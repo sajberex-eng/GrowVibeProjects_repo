@@ -1,0 +1,322 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}{{ meeting }}{% endblock %}
+{% block content %}
+<style>
+  .agenda-item { border-bottom:1px solid var(--border); padding:12px 0; display:flex; gap:12px; }
+  .agenda-item:last-child { border-bottom:0; }
+  .agenda-item .n { font-weight:700; font-size:1.1rem; min-width:28px; color: var(--accent); }
+  .agenda-item .body { flex:1; min-width:0; }
+  .agenda-item .meta { display:flex; flex-wrap:wrap; gap:4px 14px; font-size:.85rem; color:var(--muted); margin-top:3px; }
+  .agenda-item .tools { display:flex; flex-wrap:wrap; gap:4px; align-items:flex-start; justify-content:flex-end; }
+  .agenda-item.control { background: var(--surface-2); margin: 0 -18px; padding: 12px 18px; }
+  .quorum { font-size:1.05rem; }
+  details summary { cursor:pointer; color: var(--blue); }
+  .ack-form .radios ul { list-style:none; padding:0; margin:0 0 8px; display:flex; gap:14px; flex-wrap:wrap; }
+  @media (max-width: 700px) { .agenda-item { flex-wrap:wrap; } .agenda-item .tools { width:100%; justify-content:flex-start; } }
+</style>
+{% include "meetings/_crumbs.html" %}
+<div class="page-head">
+  <div>
+    <h1>{{ commission.short_name }}: заседание {{ meeting.starts_at|local_dt:"%d.%m.%Y" }}</h1>
+    <div class="sub">{{ commission.name }}</div>
+    <div style="margin-top:6px">
+      {% status_badge meeting %}
+      {% if meeting.kind == 'extra' %}{% badge "внеочередное" "amber" %}{% endif %}
+      {% if meeting.agenda_status == 'approved' %}{% badge "повестка утверждена" "green" %}{% elif meeting.agenda_status == 'submitted' %}{% badge "повестка на утверждении" "amber" %}{% else %}{% badge "повестка формируется" "gray" %}{% endif %}
+    </div>
+  </div>
+  <div class="actions">
+    <a class="btn btn-sm" href="{% url 'meetings:ics' meeting.pk %}">📅 В календарь</a>
+    <a class="btn btn-sm" href="{% url 'meetings:agenda_docx' meeting.pk %}">Повестка DOCX</a>
+    {% if can_manage %}
+      {% if meeting.is_upcoming %}
+        <a class="btn btn-sm" href="{% url 'meetings:edit' meeting.pk %}">Изменить</a>
+        <a class="btn btn-sm" href="{% url 'meetings:reschedule' meeting.pk %}">Перенести</a>
+        <a class="btn btn-sm btn-danger" href="{% url 'meetings:cancel' meeting.pk %}">Отменить</a>
+        <form class="inline" method="post" action="{% url 'meetings:mark_held' meeting.pk %}">{% csrf_token %}<button class="btn btn-sm" data-confirm="Отметить заседание как проведённое?">Отметить проведённым</button></form>
+      {% endif %}
+      {% if has_protocol_create_url and meeting.status != 'cancelled' %}<a class="btn btn-sm btn-primary" href="{% url 'protocols:create_from_meeting' meeting.pk %}">Сформировать протокол</a>{% endif %}
+    {% endif %}
+  </div>
+</div>
+
+{% if meeting.status == 'cancelled' %}<div class="callout danger">Заседание отменено{% if meeting.cancel_reason %}: {{ meeting.cancel_reason }}{% endif %}.</div>{% endif %}
+{% if invited_only %}<div class="callout info">Вы приглашены на это заседание{% if invitation %}; доступ открыт до {{ invitation.valid_until|date:"d.m.Y" }}{% endif %}.</div>{% endif %}
+
+<div class="grid-2" style="margin-bottom:16px">
+  <div class="card">
+    <dl class="kv">
+      <dt>Дата и время</dt><dd><b>{{ meeting.starts_at|local_dt }}</b>–{{ meeting.ends_at|local_dt:"%H:%M" }} ({{ meeting.duration_minutes }} мин)</dd>
+      {% if meeting.original_starts_at %}<dt>Исходная дата</dt><dd>{{ meeting.original_starts_at|local_dt }}</dd>{% endif %}
+      <dt>Формат</dt><dd>{{ meeting.get_format_display }}</dd>
+      {% if meeting.place %}<dt>Место</dt><dd>{{ meeting.place }}</dd>{% endif %}
+      {% if meeting.video_link %}<dt>Видеоконференция</dt><dd><a href="{{ meeting.video_link }}" target="_blank" rel="noopener">{{ meeting.video_link|truncatechars:60 }}</a></dd>{% endif %}
+      {% if meeting.cities.all %}<dt>Площадки</dt><dd>{% for c in meeting.cities.all %}{{ c }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>{% endif %}
+      {% if meeting.proposals_deadline %}<dt>Предложения в повестку</dt><dd>до {{ meeting.proposals_deadline|local_dt }}</dd>{% endif %}
+      {% if meeting.agenda_approved_at %}<dt>Повестка утверждена</dt><dd>{{ meeting.agenda_approved_at|local_dt }}{% if meeting.agenda_approved_by %}, {{ meeting.agenda_approved_by.short_name }}{% endif %}</dd>{% endif %}
+    </dl>
+  </div>
+  <div class="card">
+    {% if not invited_only %}
+    <div class="quorum">Кворум заседания: <b>{{ quorum.present }}</b> из {{ quorum.total }} (нужно {{ quorum.needed }} — {{ commission.meeting_quorum_label }})
+      {% if quorum.present %}{% if quorum.reached %}{% badge "достигнут" "green" %}{% else %}{% badge "не достигнут" "red" %}{% endif %}{% endif %}</div>
+    <p class="small muted">Голосование по вопросам — электронное, в личном кабинете; кворум голосования {{ commission.vote_quorum_label }}.</p>
+    {% endif %}
+    {% if reschedules %}
+    <details><summary>История переносов ({{ reschedules|length }})</summary>
+      <ul class="list-plain small">{% for r in reschedules %}<li>{{ r.old_starts_at|local_dt }} → {{ r.new_starts_at|local_dt }}{% if r.reason %} · {{ r.reason }}{% endif %}<div class="muted">{{ r.changed_at|local_dt }}{% if r.changed_by %}, {{ r.changed_by.short_name }}{% endif %}</div></li>{% endfor %}</ul>
+    </details>
+    {% endif %}
+    {% if can_manage and new_proposals %}<p class="callout">Новых предложений в повестку: <a href="?tab=proposals">{{ new_proposals }}</a></p>{% endif %}
+  </div>
+</div>
+
+<nav class="tabs">
+  {% for key, label in tabs %}<a href="?tab={{ key }}" class="{% if key == tab %}active{% endif %}">{{ label }}{% if key == 'proposals' and new_proposals %} <span class="badge badge-blue">{{ new_proposals }}</span>{% endif %}</a>{% endfor %}
+</nav>
+
+{% if tab == 'agenda' %}
+<div class="card">
+  <div class="card-head">
+    <h2>Повестка <span class="muted small">· {{ items|length }} вопр., ≈ {{ total_minutes }} мин</span></h2>
+    <div class="actions">
+      {% if can_manage and meeting.status != 'cancelled' %}
+        <a class="btn btn-sm btn-primary" href="{% url 'meetings:item_add' meeting.pk %}">+ Вопрос</a>
+        {% if meeting.is_upcoming %}
+        <form class="inline" method="post" action="{% url 'meetings:control_refresh' meeting.pk %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Обновить контроль исполнения</button></form>
+        {% endif %}
+        {% if meeting.agenda_status == 'draft' and items %}
+        <form class="inline" method="post" action="{% url 'meetings:agenda_submit' meeting.pk %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Направить председателю</button></form>
+        {% endif %}
+      {% endif %}
+      {% if can_approve and meeting.agenda_status != 'approved' and items and meeting.is_upcoming %}
+        <form class="inline" method="post" action="{% url 'meetings:agenda_approve' meeting.pk %}">{% csrf_token %}<button class="btn btn-sm btn-primary" type="submit" data-confirm="Утвердить повестку? Состав комиссии и приглашённые получат уведомление.">Утвердить повестку</button></form>
+      {% endif %}
+      {% if can_approve and meeting.agenda_status == 'submitted' %}
+        <form class="inline" method="post" action="{% url 'meetings:agenda_return' meeting.pk %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Вернуть на доработку</button></form>
+      {% endif %}
+      {% if can_propose %}<a class="btn btn-sm" href="{% url 'meetings:proposal_create' meeting.pk %}">Предложить вопрос</a>{% endif %}
+    </div>
+  </div>
+  {% for item in items %}
+  <div class="agenda-item{% if item.is_control_item %} control{% endif %}">
+    <div class="n">{{ item.position }}.</div>
+    <div class="body">
+      <div><b>{{ item.title }}</b>
+        {% if item.is_control_item %}{% badge "контроль исполнения" "blue" %}{% endif %}
+        {% if item.requires_vote %}{% badge "голосование" "amber" %}{% endif %}
+        {% if item.proposal_id %}{% badge "по предложению" "gray" %}{% endif %}</div>
+      <div class="meta">
+        {% if item.speaker_display %}<span>Докладчик: {{ item.speaker_display }}</span>{% endif %}
+        <span>Регламент: {{ item.duration_minutes }} мин</span>
+        {% if item.rubric %}<span>Рубрика: {{ item.rubric }}</span>{% endif %}
+        {% if show_patient and item.patient_id %}<span>ID пациента (МИС): <code>{{ item.patient_id }}</code></span>{% endif %}
+      </div>
+      {% if item.description %}
+        {% if item.is_control_item %}<details style="margin-top:6px"><summary>Открытые поручения</summary><div class="text-block small">{{ item.description }}</div></details>
+        {% else %}<div class="text-block small" style="margin-top:6px">{{ item.description }}</div>{% endif %}
+      {% endif %}
+      {% if item.materials.all %}
+      <div class="small" style="margin-top:4px">📎 {% for mat in item.materials.all %}<a href="{% if mat.kind == 'file' %}{% url 'meetings:material_download' mat.pk %}{% else %}{{ mat.url }}{% endif %}" {% if mat.kind != 'file' %}target="_blank" rel="noopener"{% endif %}>{{ mat.title }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+      {% endif %}
+      {% for v in item.votings.all %}
+      <div class="small" style="margin-top:4px">Голосование:
+        {% if has_vote_detail_url %}<a href="{% url 'voting:detail' v.pk %}">{{ v.get_status_display }}</a>{% else %}{{ v.get_status_display }}{% endif %}
+        {% if v.status == 'open' %}{% status_badge v %} · до {{ v.deadline|local_dt }}{% endif %}
+        {% if v.outcome %}{% status_badge v field="outcome" %} <span class="muted">за {{ v.votes_for }} · против {{ v.votes_against }} · возд. {{ v.votes_abstain }}</span>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% if can_manage and meeting.status != 'cancelled' %}
+    <div class="tools">
+      {% if item.requires_vote and has_vote_create_url and not item.votings.all %}
+        <a class="btn btn-sm btn-primary" href="{% url 'voting:create_for_item' item.pk %}">Открыть голосование</a>
+      {% endif %}
+      {% if not item.is_control_item %}
+      <form class="inline" method="post" action="{% url 'meetings:item_move' item.pk 'up' %}">{% csrf_token %}<button class="btn btn-sm btn-ghost" title="Выше" aria-label="Выше">↑</button></form>
+      <form class="inline" method="post" action="{% url 'meetings:item_move' item.pk 'down' %}">{% csrf_token %}<button class="btn btn-sm btn-ghost" title="Ниже" aria-label="Ниже">↓</button></form>
+      {% endif %}
+      <a class="btn btn-sm" href="{% url 'meetings:item_edit' item.pk %}">Изменить</a>
+      <a class="btn btn-sm btn-ghost" href="{% url 'meetings:material_add' meeting.pk %}?item={{ item.pk }}" title="Прикрепить материал">📎</a>
+      <form class="inline" method="post" action="{% url 'meetings:item_delete' item.pk %}">{% csrf_token %}<button class="btn btn-sm btn-danger" data-confirm="Удалить вопрос из повестки?" aria-label="Удалить">✕</button></form>
+    </div>
+    {% endif %}
+  </div>
+  {% empty %}
+  <p class="empty">Вопросы повестки ещё не добавлены.</p>
+  {% endfor %}
+</div>
+
+{% if can_acknowledge %}
+<div class="card ack-form">
+  <h2>Ознакомление с повесткой</h2>
+  {% if my_ack %}<p class="small">Ваша отметка: {% status_badge my_ack %} от {{ my_ack.created_at|local_dt }}</p>{% endif %}
+  <form method="post" action="{% url 'meetings:acknowledge' meeting.pk %}">
+    {% csrf_token %}
+    <div class="radios">{{ ack_form.status }}</div>
+    <div class="field"><label for="{{ ack_form.text.id_for_label }}">{{ ack_form.text.label }}</label>{{ ack_form.text }}
+      <div class="help">Заполняется, если есть предложение по утверждённой повестке.</div></div>
+    <button class="btn btn-primary" type="submit">Отправить</button>
+  </form>
+</div>
+{% endif %}
+
+{% elif tab == 'materials' %}
+<div class="card">
+  <div class="card-head"><h2>Материалы</h2>
+    {% if can_manage %}<div class="actions">
+      <a class="btn btn-sm btn-primary" href="{% url 'meetings:material_add' meeting.pk %}?type=file">+ Файл</a>
+      <a class="btn btn-sm" href="{% url 'meetings:material_add' meeting.pk %}?type=link">+ Ссылка / видео</a>
+    </div>{% endif %}
+  </div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Материал</th><th>К вопросу</th><th>Вид</th><th>Размер</th><th>Добавлен</th>{% if can_manage %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for mat in materials %}
+    <tr>
+      <td>{% if mat.kind == 'file' %}<a href="{% url 'meetings:material_download' mat.pk %}">{{ mat.title }}</a> <a class="small" href="{% url 'meetings:material_download' mat.pk %}?download=1">скачать</a>
+          {% else %}<a href="{{ mat.url }}" target="_blank" rel="noopener">{{ mat.title }}</a>{% endif %}
+          {% if mat.file_name and mat.file_name != mat.title %}<div class="small muted">{{ mat.file_name }}</div>{% endif %}</td>
+      <td>{% if mat.agenda_item %}{{ mat.agenda_item.position }}. {{ mat.agenda_item.title|truncatechars:50 }}{% else %}<span class="muted">к заседанию</span>{% endif %}</td>
+      <td>{{ mat.get_kind_display }}</td>
+      <td class="num">{% if mat.file_size %}{{ mat.file_size|filesize }}{% else %}—{% endif %}</td>
+      <td class="small">{{ mat.created_at|local_dt }}{% if mat.uploaded_by %}<div class="muted">{{ mat.uploaded_by.short_name }}</div>{% endif %}</td>
+      {% if can_manage %}<td><form class="inline" method="post" action="{% url 'meetings:material_delete' mat.pk %}">{% csrf_token %}<button class="btn btn-sm btn-danger" data-confirm="Удалить материал?">Удалить</button></form></td>{% endif %}
+    </tr>
+    {% empty %}<tr><td colspan="6" class="empty">Материалов нет</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+{% if audio and not invited_only %}<p class="small muted">Аудиозаписи заседания — на вкладке «Записи и транскрипты».</p>{% endif %}
+
+{% elif tab == 'participants' %}
+<div class="card">
+  <div class="card-head"><h2>Присутствие</h2>
+    {% if can_manage %}<a class="btn btn-sm btn-primary" href="{% url 'meetings:attendance' meeting.pk %}">Отметить присутствие</a>{% endif %}</div>
+  <p class="quorum">Кворум: <b>{{ quorum.present }}</b> из {{ quorum.total }}, требуется {{ quorum.needed }} ({{ commission.meeting_quorum_label }}) —
+    {% if quorum.reached %}{% badge "достигнут" "green" %}{% else %}{% badge "не достигнут" "red" %}{% endif %}</p>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Участник</th><th>Роль</th><th>Отметка</th><th>Причина</th></tr></thead>
+    <tbody>
+    {% for row in attendance %}
+    <tr><td>{{ row.user.full_name }}<div class="small muted">{{ row.user.position|default:"" }}{% if row.user.city %} · {{ row.user.city }}{% endif %}</div></td>
+      <td>{{ row.role }}</td>
+      <td>{% if row.record %}{% status_badge row.record %}{% else %}<span class="muted">не отмечено</span>{% endif %}</td>
+      <td>{{ row.record.reason|default:"" }}</td></tr>
+    {% empty %}<tr><td colspan="4" class="empty">Состав комиссии на дату заседания не сформирован</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Приглашённые участники</h2>
+    {% if can_manage %}<a class="btn btn-sm" href="{% url 'meetings:invitation_add' meeting.pk %}">+ Пригласить</a>{% endif %}</div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>ФИО</th><th>Доступ до</th><th>Примечание</th>{% if can_manage %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for inv in invitations %}
+    <tr class="{% if not inv.is_valid %}row-muted{% endif %}"><td>{{ inv.user.full_name }}<div class="small muted">{{ inv.user.position|default:"" }}</div></td>
+      <td>{{ inv.valid_until|date:"d.m.Y" }}{% if not inv.is_valid %} {% badge "истёк" "gray" %}{% endif %}</td>
+      <td>{{ inv.note }}</td>
+      {% if can_manage %}<td><form class="inline" method="post" action="{% url 'meetings:invitation_delete' inv.pk %}">{% csrf_token %}<button class="btn btn-sm btn-danger" data-confirm="Отозвать приглашение?">Отозвать</button></form></td>{% endif %}
+    </tr>
+    {% empty %}<tr><td colspan="4" class="empty">Приглашённых нет</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+<div class="card">
+  <h2>Ознакомление с повесткой</h2>
+  {% if meeting.agenda_status == 'approved' %}
+  <p class="small muted">Ознакомились: {{ ack_count }} из {{ acks|length }}</p>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Участник</th><th>Отметка</th><th>Когда</th><th>Предложение</th></tr></thead>
+    <tbody>
+    {% for a in acks %}
+    <tr><td>{{ a.user.full_name }}</td>
+      <td>{% if a.ack %}{% status_badge a.ack %}{% else %}<span class="muted">нет отметки</span>{% endif %}</td>
+      <td class="small">{% if a.ack %}{{ a.ack.created_at|local_dt }}{% endif %}</td>
+      <td class="text-block small">{{ a.ack.text|default:"" }}</td></tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% else %}<p class="empty">Отметки об ознакомлении собираются после утверждения повестки председателем.</p>{% endif %}
+</div>
+
+{% elif tab == 'proposals' %}
+<div class="card">
+  <div class="card-head"><h2>Предложения в повестку</h2>
+    {% if can_propose %}<a class="btn btn-sm btn-primary" href="{% url 'meetings:proposal_create' meeting.pk %}">Предложить вопрос</a>{% endif %}</div>
+  {% if meeting.is_open_for_proposals %}<p class="small muted">Приём предложений открыт{% if meeting.proposals_deadline %} до {{ meeting.proposals_deadline|local_dt }}{% else %} до утверждения повестки{% endif %}.</p>
+  {% else %}<p class="small muted">Приём предложений закрыт.</p>{% endif %}
+  {% if not can_manage %}<p class="small muted">Показаны ваши предложения.</p>{% endif %}
+  <ul class="list-plain">
+    {% for p in proposals %}
+    <li>
+      <div><b>{{ p.title }}</b> {% status_badge p %} {% if p.requires_vote %}{% badge "голосование" "amber" %}{% endif %}</div>
+      <div class="small muted">{{ p.author.short_name }} · {{ p.created_at|local_dt }}{% if p.speaker_name %} · докладчик: {{ p.speaker_name }}{% endif %}{% if show_patient and p.patient_id %} · ID пациента: <code>{{ p.patient_id }}</code>{% endif %}</div>
+      {% if p.description %}<div class="text-block small">{{ p.description }}</div>{% endif %}
+      {% if p.file %}<div class="small">📎 <a href="{% url 'meetings:proposal_file' p.pk %}">{{ p.file_name|default:"файл" }}</a></div>{% endif %}
+      {% if p.response %}<div class="small">Ответ секретаря: {{ p.response }}</div>{% endif %}
+      {% if can_manage and p.status == 'new' %}
+      <div class="actions" style="margin-top:6px">
+        <form class="inline" method="post" action="{% url 'meetings:proposal_accept' p.pk %}">{% csrf_token %}<button class="btn btn-sm btn-primary">Включить в повестку</button></form>
+        <a class="btn btn-sm btn-danger" href="{% url 'meetings:proposal_reject' p.pk %}">Отклонить</a>
+      </div>
+      {% endif %}
+    </li>
+    {% empty %}<li class="empty">Предложений нет</li>{% endfor %}
+  </ul>
+</div>
+
+{% elif tab == 'records' %}
+<div class="card">
+  <div class="card-head"><h2>Записи заседания</h2>
+    {% if can_manage %}<div class="actions">
+      <a class="btn btn-sm btn-primary" href="{% url 'meetings:material_add' meeting.pk %}?type=audio">+ Ссылка на аудиозапись</a>
+      <a class="btn btn-sm" href="{% url 'meetings:material_add' meeting.pk %}?type=video">+ Ссылка на видеозапись</a>
+    </div>{% endif %}</div>
+  <p class="small muted">Аудиофайл в систему не загружается — хранится только ссылка на запись.{% if not transcription_configured %} Автоматическая транскрипция не настроена — текст можно внести вручную.{% endif %}</p>
+  <ul class="list-plain">
+    {% for mat in audio %}
+    <li><div><b>{{ mat.title }}</b> {% badge mat.get_kind_display "gray" %}</div>
+      <div class="small"><a href="{{ mat.url }}" target="_blank" rel="noopener">{{ mat.url|truncatechars:80 }}</a></div>
+      {% if can_manage %}
+      <div class="actions" style="margin-top:6px">
+        {% if mat.kind == 'audio' %}
+        <form class="inline" method="post" action="{% url 'meetings:transcribe' mat.pk %}">{% csrf_token %}<button class="btn btn-sm">Распознать</button></form>
+        <a class="btn btn-sm" href="{% url 'meetings:transcript_manual' meeting.pk %}?audio={{ mat.pk }}">Внести текст вручную</a>
+        {% endif %}
+        <form class="inline" method="post" action="{% url 'meetings:material_delete' mat.pk %}">{% csrf_token %}<button class="btn btn-sm btn-danger" data-confirm="Удалить ссылку на запись?">Удалить</button></form>
+      </div>
+      {% endif %}
+    </li>
+    {% empty %}<li class="empty">Записей нет</li>{% endfor %}
+  </ul>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Транскрипты</h2>
+    {% if can_manage %}<a class="btn btn-sm" href="{% url 'meetings:transcript_manual' meeting.pk %}">Внести текст вручную</a>{% endif %}</div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Запись</th><th>Статус</th><th>Обновлён</th><th></th></tr></thead>
+    <tbody>
+    {% for t in transcripts %}
+    <tr><td>{{ t.audio.title|default:"без привязки к записи" }}</td>
+      <td>{% status_badge t %}{% if t.error %}<div class="small muted">{{ t.error|truncatechars:120 }}</div>{% endif %}</td>
+      <td class="small">{{ t.updated_at|local_dt }}{% if t.created_by %}<div class="muted">{{ t.created_by.short_name }}</div>{% endif %}</td>
+      <td class="nowrap"><a class="btn btn-sm" href="{% url 'meetings:transcript_view' t.pk %}">Открыть</a>
+        {% if can_manage %}<a class="btn btn-sm" href="{% url 'meetings:transcript_edit' t.pk %}">Править</a>
+        <form class="inline" method="post" action="{% url 'meetings:transcript_delete' t.pk %}">{% csrf_token %}<button class="btn btn-sm btn-danger" data-confirm="Удалить транскрипт?">✕</button></form>{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="4" class="empty">Транскриптов нет</td></tr>{% endfor %}
+    </tbody></table></div>
+</div>
+
+{% elif tab == 'protocols' %}
+<div class="card">
+  <div class="card-head"><h2>Протоколы заседания</h2>
+    {% if can_manage and has_protocol_create_url and meeting.status != 'cancelled' %}<a class="btn btn-sm btn-primary" href="{% url 'protocols:create_from_meeting' meeting.pk %}">Сформировать протокол</a>{% endif %}</div>
+  <ul class="list-plain">
+    {% for p in protocols %}
+    <li>{% if has_protocol_detail_url %}<a href="{% url 'protocols:detail' p.pk %}">{{ p }}</a>{% else %}{{ p }}{% endif %} {% status_badge p %}</li>
+    {% empty %}<li class="empty">Протокол ещё не сформирован</li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock %}

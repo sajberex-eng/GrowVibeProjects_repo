@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Протокол заочного голосования{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'committees:detail' commission.pk %}">{{ commission.short_name }}</a> / <a href="{% url 'protocols:list' %}">Протоколы</a></div>
+<div class="page-head"><div><h1>Протокол заочного голосования</h1><div class="sub">{{ commission.name }}</div></div></div>
+<div class="card">
+  <form method="post">{% csrf_token %}
+    <p>Выберите завершённые заочные голосования, которые войдут в протокол (один вопрос — одно голосование).</p>
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th></th><th>Вопрос</th><th>Завершено</th><th>Итог</th><th class="num">За / против / возд.</th></tr></thead>
+      <tbody>
+      {% for s in sessions %}
+      <tr><td><input type="checkbox" name="sessions" value="{{ s.pk }}" id="s{{ s.pk }}" aria-label="Выбрать"></td>
+        <td><label for="s{{ s.pk }}">{{ s.question }}</label></td>
+        <td class="nowrap">{{ s.closed_at|local_dt }}</td>
+        <td>{% status_badge s "outcome" %}</td>
+        <td class="num">{{ s.votes_for }} / {{ s.votes_against }} / {{ s.votes_abstain }}</td></tr>
+      {% empty %}<tr><td colspan="5" class="empty">Нет завершённых заочных голосований, не включённых в протоколы.</td></tr>{% endfor %}
+      </tbody></table></div>
+    {% if sessions %}<div class="actions" style="margin-top:12px"><button class="btn btn-primary" type="submit">Создать протокол</button></div>{% endif %}
+  </form>
+</div>
+{% endblock %}

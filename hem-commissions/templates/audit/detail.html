@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Запись журнала аудита{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'audit:list' %}">Журнал аудита</a></div>
+<div class="page-head"><div><h1>Запись № {{ entry.pk }}</h1><div class="sub">{{ entry.action }}</div></div></div>
+<div class="card">
+  <dl class="kv">
+    <dt>Дата и время</dt><dd>{{ entry.created_at|local_dt:"%d.%m.%Y %H:%M:%S" }}</dd>
+    <dt>Пользователь</dt><dd>{% if entry.user %}{{ entry.user.full_name|default:entry.user.username }} ({{ entry.user.username }}){% else %}—{% endif %}</dd>
+    <dt>IP-адрес</dt><dd>{{ entry.ip_address|default:"—" }}</dd>
+    <dt>Действие</dt><dd>{{ entry.action }}</dd>
+    <dt>Тип объекта</dt><dd>{{ entry.object_type|default:"—" }}</dd>
+    <dt>ID объекта</dt><dd>{{ entry.object_id|default:"—" }}</dd>
+    <dt>Объект</dt><dd>{{ entry.object_repr|default:"—" }}</dd>
+  </dl>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Подробности</h2></div>
+  <pre class="text-block small" style="margin:0; overflow-x:auto">{{ details_json }}</pre>
+</div>
+{% endblock %}

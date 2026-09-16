@@ -1,0 +1,49 @@
+{% load ui %}
+<div class="card form-narrow">
+  <div class="card-head"><h2>Параметры работы комиссии</h2></div>
+  <p class="small muted">Сейчас: кворум заседания — {{ commission.meeting_quorum_label }}; кворум голосования — {{ commission.vote_quorum_label }}.</p>
+  <form method="post" action="{% url 'committees:settings_edit' commission.pk %}">{% csrf_token %}
+    {% include "partials/form.html" with form=settings_form %}
+    <button class="btn btn-primary" type="submit">Сохранить настройки</button>
+  </form>
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-head"><h2>Рубрикатор вопросов</h2></div>
+    <ul class="list-plain">
+      {% for r in rubrics %}
+      <li style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <span>{{ r.name }} <span class="small muted">· {{ r.sort }}</span></span>
+        <span class="nowrap">
+          <a class="btn btn-sm btn-ghost" href="{% url 'committees:rubric_edit' commission.pk r.pk %}">Изменить</a>
+          <form class="inline" method="post" action="{% url 'committees:rubric_delete' commission.pk r.pk %}">{% csrf_token %}<button class="btn btn-sm btn-danger" type="submit" data-confirm="Удалить рубрику «{{ r.name }}»?">Удалить</button></form>
+        </span>
+      </li>
+      {% empty %}<li class="empty">Рубрик нет.</li>{% endfor %}
+    </ul>
+    <form method="post" action="{% url 'committees:rubric_add' commission.pk %}" style="margin-top:12px">{% csrf_token %}
+      {% include "partials/form.html" with form=rubric_form %}
+      <button class="btn" type="submit">+ Добавить рубрику</button>
+    </form>
+  </div>
+
+  {% if is_admin %}
+  <div class="card">
+    <div class="card-head"><h2>Руководители-наблюдатели</h2></div>
+    <p class="small muted">Наблюдатель видит материалы и документы комиссии, но не голосует.</p>
+    <ul class="list-plain">
+      {% for o in observers %}
+      <li style="display:flex;justify-content:space-between;gap:8px;align-items:center">
+        <span>{{ o.user.full_name }}<div class="small muted">с {{ o.granted_at|local_dt:"%d.%m.%Y" }}{% if o.granted_by %}, выдал {{ o.granted_by.short_name }}{% endif %}</div></span>
+        <form class="inline" method="post" action="{% url 'committees:observer_revoke' commission.pk o.pk %}">{% csrf_token %}<button class="btn btn-sm btn-danger" type="submit" data-confirm="Отозвать доступ?">Отозвать</button></form>
+      </li>
+      {% empty %}<li class="empty">Наблюдателей нет.</li>{% endfor %}
+    </ul>
+    <form method="post" action="{% url 'committees:observer_grant' commission.pk %}" style="margin-top:12px">{% csrf_token %}
+      {% include "partials/form.html" with form=observer_form %}
+      <button class="btn" type="submit">Предоставить доступ</button>
+    </form>
+  </div>
+  {% endif %}
+</div>

@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Журнал аудита{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Журнал аудита</h1>
+  <div class="sub">Неизменяемый журнал действий пользователей</div></div></div>
+
+<form class="filters" method="get">
+  <div class="field"><label for="a-user">Пользователь</label>
+    <select id="a-user" name="user"><option value="">Все</option>
+      {% for u in users %}<option value="{{ u.pk }}" {% if f.user == u.pk|stringformat:"s" %}selected{% endif %}>{{ u.full_name|default:u.username }}</option>{% endfor %}
+    </select></div>
+  <div class="field"><label for="a-action">Действие</label>
+    <select id="a-action" name="action"><option value="">Все</option>
+      {% for a in actions %}<option value="{{ a }}" {% if f.action == a %}selected{% endif %}>{{ a }}</option>{% endfor %}
+    </select></div>
+  <div class="field"><label for="a-type">Тип объекта</label>
+    <select id="a-type" name="object_type"><option value="">Все</option>
+      {% for t in object_types %}<option value="{{ t }}" {% if f.object_type == t %}selected{% endif %}>{{ t }}</option>{% endfor %}
+    </select></div>
+  <div class="field"><label for="a-from">С</label><input id="a-from" type="date" name="date_from" value="{{ f.date_from }}"></div>
+  <div class="field"><label for="a-to">По</label><input id="a-to" type="date" name="date_to" value="{{ f.date_to }}"></div>
+  <div class="field"><label for="a-q">Поиск</label><input id="a-q" type="search" name="q" value="{{ f.q }}" placeholder="объект, ID, IP, фамилия"></div>
+  <button class="btn" type="submit">Показать</button>
+  <a class="btn btn-ghost" href="{% url 'audit:list' %}">Сбросить</a>
+</form>
+
+<div class="card">
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Дата и время</th><th>Пользователь</th><th>IP</th><th>Действие</th><th>Тип объекта</th><th>Объект</th><th></th></tr></thead>
+    <tbody>
+    {% for e in page %}
+    <tr>
+      <td class="nowrap">{{ e.created_at|local_dt:"%d.%m.%Y %H:%M:%S" }}</td>
+      <td>{% if e.user %}{{ e.user.short_name }}{% else %}<span class="muted">—</span>{% endif %}</td>
+      <td class="nowrap">{{ e.ip_address|default:"—" }}</td>
+      <td>{{ e.action }}</td>
+      <td class="small">{{ e.object_type|default:"—" }}{% if e.object_id %} #{{ e.object_id }}{% endif %}</td>
+      <td>{{ e.object_repr|truncatechars:80 }}</td>
+      <td><a class="btn btn-sm" href="{% url 'audit:detail' e.pk %}">Подробно</a></td>
+    </tr>
+    {% empty %}<tr><td colspan="7" class="empty">Записей нет</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

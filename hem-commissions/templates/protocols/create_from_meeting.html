@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Черновик протокола{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'meetings:detail' meeting.pk %}">{{ meeting }}</a> / Протокол</div>
+<div class="page-head"><div><h1>Сформировать черновик протокола</h1>
+  <div class="sub">{{ meeting.commission.name }} · {{ meeting.starts_at|local_dt }}</div></div></div>
+
+{% if existing %}
+<div class="callout">По этому заседанию уже есть протокол:
+  {% for p in existing %}<a href="{% url 'protocols:detail' p.pk %}">№ {{ p.number }}</a> {% status_badge p %}{% if not forloop.last %}, {% endif %}{% endfor %}.
+  Создавайте новый только при необходимости.</div>
+{% endif %}
+
+<div class="card">
+  <p>В черновик будут перенесены реквизиты заседания, повестка, докладчики, итоги завершённых голосований.
+  {% if meeting.commission.handles_patient_cases %}Для клинических случаев используются только ID пациентов из МИС; система подсветит возможные ФИО.{% endif %}</p>
+  <form method="post">{% csrf_token %}
+    <div class="field"><label>Текст выступлений («Выступили»)</label>
+      <ul class="list-plain">
+        <li><label><input type="radio" name="transcript" value="" {% if not transcripts %}checked{% endif %}> Без транскрипта — заполню вручную</label></li>
+        {% for t in transcripts %}
+        <li><label><input type="radio" name="transcript" value="{{ t.pk }}" {% if forloop.first %}checked{% endif %}>
+          Транскрипт от {{ t.created_at|local_dt }} ({{ t.get_status_display|lower }}, {{ t.text|length }} символов)</label></li>
+        {% endfor %}
+      </ul>
+      <div class="help">Если в транскрипте найдены названия вопросов повестки, текст будет разделён по вопросам; иначе — целиком помещён в первый вопрос.</div>
+    </div>
+    <div class="actions"><button class="btn btn-primary" type="submit">Создать черновик</button>
+      <a class="btn btn-ghost" href="{% url 'meetings:detail' meeting.pk %}">Отмена</a></div>
+  </form>
+</div>
+{% endblock %}

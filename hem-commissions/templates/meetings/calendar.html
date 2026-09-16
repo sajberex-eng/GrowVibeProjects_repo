@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Заседания и график{% endblock %}
+{% block content %}
+<style>
+  .cal-toolbar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; justify-content:space-between; margin-bottom:12px; }
+  .cal-toolbar h2 { margin:0; min-width:170px; }
+  .calendar .event small { opacity:.8; }
+  .calendar .event.postponed { background: var(--amber-soft); color: var(--amber); }
+  .year-grid .card h3 a { color: inherit; }
+  .year-grid .card { margin-bottom:0; }
+  .month-list { display:none; }
+  @media (max-width: 700px) {
+    .calendar .event span.t { display:none; }
+    .month-list { display:block; margin-top:14px; }
+  }
+</style>
+<div class="page-head">
+  <div>
+    <h1>Заседания и график</h1>
+    <div class="sub">{% if commission %}{{ commission.name }}{% else %}Сводный календарь всех доступных комиссий{% endif %}</div>
+  </div>
+  <div class="actions">
+    <a class="btn" href="{% url 'meetings:list' %}">Список</a>
+    {% if manageable %}
+      <a class="btn btn-primary" href="{% url 'meetings:create' %}{% if commission %}?commission={{ commission.pk }}{% endif %}">+ Заседание</a>
+      {% if commission and commission in manageable %}
+      <a class="btn" href="{% url 'meetings:schedule' commission.pk %}?year={{ year }}">График на год</a>
+      {% endif %}
+    {% endif %}
+    <a class="btn btn-ghost" href="{% url 'meetings:my_ics' %}" title="Файл iCalendar для Outlook / Google / телефона">📅 Мои заседания (.ics)</a>
+    {% if commission %}<a class="btn btn-ghost" href="{% url 'meetings:commission_ics' commission.pk %}?year={{ year }}">.ics комиссии за {{ year }}</a>{% endif %}
+  </div>
+</div>
+
+<form class="filters" method="get">
+  <input type="hidden" name="view" value="{{ view }}">
+  {% if view == 'year' %}<input type="hidden" name="year" value="{{ year }}">{% else %}<input type="hidden" name="month" value="{{ request.GET.month|default:'' }}">{% endif %}
+  <div class="field"><label>Комиссия</label>
+    <select name="commission" onchange="this.form.submit()">
+      <option value="">Все комиссии</option>
+      {% for c in commissions %}<option value="{{ c.pk }}" {% if commission and c.pk == commission.pk %}selected{% endif %}>{{ c.short_name }} — {{ c.name|truncatechars:50 }}</option>{% endfor %}
+    </select></div>
+  <div class="field checkbox"><label><input type="checkbox" name="cancelled" value="1" {% if show_cancelled %}checked{% endif %} onchange="this.form.submit()"> показывать отменённые</label></div>
+  <noscript><button class="btn" type="submit">Показать</button></noscript>
+</form>
+
+<div class="tabs">
+  <a href="{% query_replace view='month' year='' %}" class="{% if view == 'month' %}active{% endif %}">Месяц</a>
+  <a href="{% query_replace view='year' month='' year=year %}" class="{% if view == 'year' %}active{% endif %}">Год</a>
+</div>
+
+{% if view == 'year' %}
+<div class="cal-toolbar">
+  <div class="actions">
+    <a class="btn btn-sm" href="{% query_replace year=prev_year %}">← {{ prev_year }}</a>
+    <h2>{{ year }} год</h2>
+    <a class="btn btn-sm" href="{% query_replace year=next_year %}">{{ next_year }} →</a>
+  </div>
+  <span class="muted small">Заседаний: {{ total }}</span>
+</div>
+<div class="year-grid">
+  {% for m in months %}
+  <div class="card">
+    <h3><a href="{% query_replace view='month' month=m.param year='' %}">{{ m.name }}</a></h3>
+    {% if m.meetings %}
+    <ul class="list-plain small">
+      {% for mt in m.meetings %}
+      <li><a href="{% url 'meetings:detail' mt.pk %}">{{ mt.starts_at|local_dt:"%d.%m %H:%M" }} · <b>{{ mt.commission.short_name }}</b></a>
+        {% if mt.status != 'planned' %}{% status_badge mt %}{% endif %}{% if mt.kind == 'extra' %} {% badge "внеоч." "amber" %}{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="muted small">—</p>{% endif %}
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="cal-toolbar">
+  <div class="actions">
+    <a class="btn btn-sm" href="{% query_replace month=prev_month %}">←</a>
+    <h2>{{ month_title }}</h2>
+    <a class="btn btn-sm" href="{% query_replace month=next_month %}">→</a>
+    <a class="btn btn-sm btn-ghost" href="{% query_replace month=this_month %}">Сегодня</a>
+  </div>
+  <span class="muted small"><span class="badge badge-blue">запланировано</span> <span class="badge badge-amber">перенесено</span> <span class="badge badge-green">проведено</span></span>
+</div>
+<div class="calendar">
+  {% for d in dow %}<div class="dow">{{ d }}</div>{% endfor %}
+  {% for day in days %}
+  <div class="day{% if day.other %} other{% endif %}{% if day.today %} today{% endif %}">
+    <span class="num">{{ day.date.day }}</span>
+    {% for mt in day.meetings %}
+    <a class="event {{ mt.status }}" href="{% url 'meetings:detail' mt.pk %}" title="{{ mt.commission.name }} · {{ mt.starts_at|local_dt }} · {{ mt.get_status_display }}"><span class="t">{{ mt.starts_at|local_dt:"%H:%M" }} </span>{{ mt.commission.short_name }}</a>
+    {% endfor %}
+  </div>
+  {% endfor %}
+</div>
+<div class="month-list card">
+  <h3>{{ month_title }}</h3>
+  {% if month_list %}
+  <ul class="list-plain">
+    {% for mt in month_list %}
+    <li><a href="{% url 'meetings:detail' mt.pk %}">{{ mt.starts_at|local_dt }} · <b>{{ mt.commission.short_name }}</b></a> {% status_badge mt %}
+      <div class="small muted">{{ mt.get_format_display }}{% if mt.place %} · {{ mt.place }}{% endif %}</div></li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="empty">Заседаний нет.</p>{% endif %}
+</div>
+{% endif %}
+{% endblock %}

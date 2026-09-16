@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Предложение в повестку{% endblock %}
+{% block content %}
+{% include "meetings/_crumbs.html" with back_tab="proposals" %}
+<div class="page-head"><div><h1>Предложить вопрос в повестку</h1><div class="sub">{{ meeting }}</div></div></div>
+<div class="card form-narrow">
+  <p class="callout info">Предложение получит секретарь комиссии. После рассмотрения вы получите уведомление: вопрос будет включён в повестку или отклонён с ответом.
+  {% if meeting.proposals_deadline %}Приём предложений — до {{ meeting.proposals_deadline|date:"d.m.Y H:i" }}.{% endif %}</p>
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% include "partials/form.html" with form=form %}
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Отправить предложение</button>
+      <a class="btn btn-ghost" href="{% url 'meetings:detail' meeting.pk %}?tab=proposals">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

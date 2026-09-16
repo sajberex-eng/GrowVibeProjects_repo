@@ -1,0 +1,38 @@
+{% load ui %}
+<div class="card">
+  <div class="card-head"><h2>Положение о комиссии</h2></div>
+  {% if current %}
+  <p>Действующая редакция: <a href="{% url 'committees:regulation_download' commission.pk current.pk %}"><b>{{ current.title }}, ред. {{ current.version }}</b></a>
+    от {{ current.approved_on|date:"d.m.Y" }}{% if current.review_on %} · плановый пересмотр {{ current.review_on|date:"d.m.Y" }}{% if current.review_on <= today %} {% badge "срок пересмотра наступил" "red" %}{% endif %}{% endif %}</p>
+  {% else %}<p class="muted">Действующая редакция не загружена.</p>{% endif %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Ред.</th><th>Наименование</th><th>Утверждено</th><th>Приказ</th><th>Пересмотр</th><th>Статус</th><th></th></tr></thead>
+    <tbody>
+    {% for r in regulations %}
+    <tr class="{% if r.expired_on %}row-muted{% endif %}">
+      <td>{{ r.version }}</td>
+      <td><a href="{% url 'committees:regulation_download' commission.pk r.pk %}">{{ r.title }}</a></td>
+      <td class="nowrap">{{ r.approved_on|date:"d.m.Y" }}</td>
+      <td class="small">{% if r.order_number %}№ {{ r.order_number }}{% if r.order_date %} от {{ r.order_date|date:"d.m.Y" }}{% endif %}{% else %}—{% endif %}</td>
+      <td class="nowrap">{{ r.review_on|date:"d.m.Y"|default:"—" }}</td>
+      <td>{% if r.expired_on %}<span class="badge badge-gray">утратила силу с {{ r.expired_on|date:"d.m.Y" }}</span>{% elif r.approved_on > today %}{% badge "вступает в силу" "blue" %}{% else %}{% badge "действует" "green" %}{% endif %}</td>
+      <td>{% if manage and not r.expired_on %}
+        <form class="inline" method="post" action="{% url 'committees:regulation_expire' commission.pk r.pk %}">{% csrf_token %}
+          <input type="date" name="expired_on" value="{{ today|date:'Y-m-d' }}" style="width:auto" aria-label="Утратила силу с" required>
+          <button class="btn btn-sm btn-danger" type="submit" data-confirm="Отметить редакцию как утратившую силу без замены?">Утратила силу</button>
+        </form>{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="7" class="empty">Редакции не загружены.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% if manage and regulation_form %}
+<div class="card form-narrow">
+  <div class="card-head"><h2>Загрузить новую редакцию</h2></div>
+  <p class="small muted">Предыдущая редакция будет отмечена как утратившая силу с даты утверждения новой. За 30 дней до даты пересмотра секретарь и председатель получат напоминание.</p>
+  <form method="post" enctype="multipart/form-data" action="{% url 'committees:regulation_upload' commission.pk %}">{% csrf_token %}
+    {% include "partials/form.html" with form=regulation_form %}
+    <button class="btn btn-primary" type="submit">Загрузить</button>
+  </form>
+</div>
+{% endif %}

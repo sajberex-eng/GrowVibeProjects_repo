@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'voting:list' %}">Голосования</a>{% if session %} · <a href="{% url 'voting:detail' session.pk %}">{{ session.question|truncatechars:60 }}</a>{% endif %}</div>
+<div class="page-head"><div><h1>{{ title }}</h1>
+  {% if commission %}<div class="sub">{{ commission.name }}{% if item %} · {{ item.meeting }} · вопрос {{ item.position }}{% endif %}</div>{% endif %}</div></div>
+
+{% if select_form and not session and not item %}
+<div class="card form-narrow">
+  <form method="get" class="filters">
+    <div class="field"><label for="id_commission">Комиссия</label>{{ select_form.commission }}</div>
+    <button class="btn" type="submit">Выбрать</button>
+  </form>
+</div>
+{% endif %}
+
+{% if form %}
+<div class="card form-narrow">
+  <form method="post">{% csrf_token %}
+    {% if commission and not session and not item %}<input type="hidden" name="commission" value="{{ commission.pk }}">{% endif %}
+    {% include "partials/form.html" with form=form %}
+    <p class="small muted">Кворум голосования — {{ commission.vote_quorum_label }}. Голосуют члены комиссии, входящие в состав на дату открытия голосования.</p>
+    <button class="btn btn-primary" type="submit">Сохранить</button>
+    <a class="btn btn-ghost" href="{% if session %}{% url 'voting:detail' session.pk %}{% else %}{% url 'voting:list' %}{% endif %}">Отмена</a>
+  </form>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Регистрация приказа — {{ commission.short_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'committees:list' %}">Комиссии</a> / <a href="{% url 'committees:detail' commission.pk %}?tab=orders">{{ commission.short_name }}</a> / Регистрация приказа</div>
+<div class="page-head"><h1>Регистрация подписанного приказа</h1></div>
+<div class="card form-narrow">
+  <p><b>{{ order.title }}</b> {% status_badge order %}</p>
+  <ul class="list-plain small">
+    {% for ch in changes %}<li>{{ ch.get_action_display }}: {{ ch.user.full_name }}{% if ch.new_role %} — {{ ch.get_new_role_display }}{% endif %}{% if ch.new_position %}, {{ ch.new_position }}{% endif %}</li>
+    {% empty %}<li class="empty">Приказ не содержит изменений состава.</li>{% endfor %}
+  </ul>
+  <div class="callout info small">Изменения состава вступят в силу с даты подписания приказа. Участники получат уведомление.</div>
+  <form method="post" enctype="multipart/form-data">{% csrf_token %}
+    {% include "partials/form.html" with form=form %}
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Зарегистрировать</button>
+      <a class="btn btn-ghost" href="{% url 'committees:detail' commission.pk %}?tab=orders">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

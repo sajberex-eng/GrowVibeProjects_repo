@@ -1,0 +1,51 @@
+from django.urls import path
+
+from . import views
+
+app_name = "protocols"
+
+urlpatterns = [
+    path("", views.protocol_list, name="list"),
+    path("meeting/<int:meeting_pk>/create/", views.create_from_meeting, name="create_from_meeting"),
+    path("commission/<int:commission_pk>/absentee/", views.create_absentee, name="create_absentee"),
+    path("<int:pk>/", views.protocol_detail, name="detail"),
+    path("<int:pk>/edit/", views.protocol_edit, name="edit"),
+    path("<int:pk>/items/add/", views.item_add, name="item_add"),
+    path("items/<int:item_pk>/edit/", views.item_edit, name="item_edit"),
+    path("items/<int:item_pk>/delete/", views.item_delete, name="item_delete"),
+    path("items/<int:item_pk>/move/", views.item_move, name="item_move"),
+    path("items/<int:item_pk>/decisions/add/", views.decision_add, name="decision_add"),
+    path("decisions/<int:pk>/edit/", views.decision_edit, name="decision_edit"),
+    path("decisions/<int:pk>/delete/", views.decision_delete, name="decision_delete"),
+    path("decisions/<int:decision_pk>/assignments/add/", views.assignment_add, name="assignment_add"),
+    path("assignments/<int:pk>/edit/", views.assignment_edit, name="assignment_edit"),
+    path("assignments/<int:pk>/delete/", views.assignment_delete, name="assignment_delete"),
+    path("<int:pk>/confirm-patient-ids/", views.confirm_patient_ids, name="confirm_patient_ids"),
+    path("<int:pk>/send-to-approval/", views.send_to_approval, name="send_to_approval"),
+    path("<int:pk>/approval/respond/", views.respond_approval, name="respond_approval"),
+    path("<int:pk>/new-revision/", views.new_revision, name="new_revision"),
+    path("<int:pk>/to-signing/", views.move_to_signing, name="move_to_signing"),
+    path("<int:pk>/sign/code/", views.request_sign_code, name="request_sign_code"),
+    path("<int:pk>/sign/", views.sign, name="sign"),
+    path("<int:pk>/return/", views.return_for_rework, name="return_for_rework"),
+    path("<int:pk>/annul/", views.annul, name="annul"),
+    path("<int:pk>/replacement/", views.create_replacement, name="create_replacement"),
+    path("<int:pk>/pdf/frozen/", views.download_frozen, name="download_frozen"),
+    path("<int:pk>/pdf/signed/", views.download_signed, name="download_signed"),
+    path("<int:pk>/pdf/preview/", views.preview_pdf, name="preview_pdf"),
+    path("<int:pk>/docx/", views.export_docx, name="export_docx"),
+    path("<int:pk>/dissent/code/", views.dissent_code, name="dissent_code"),
+    path("<int:pk>/dissent/add/", views.dissent_add, name="dissent_add"),
+    path("dissents/<int:pk>/withdraw/", views.dissent_withdraw, name="dissent_withdraw"),
+    path("dissents/<int:pk>/file/", views.dissent_file, name="dissent_file"),
+    # реестр поручений
+    path("assignments/", views.assignment_list, name="assignments"),
+    path("assignments/<int:pk>/", views.assignment_detail, name="assignment_detail"),
+    path("assignments/<int:pk>/start/", views.assignment_start, name="assignment_start"),
+    path("assignments/<int:pk>/report/", views.assignment_report, name="assignment_report"),
+    path("assignments/<int:pk>/confirm/", views.assignment_confirm, name="assignment_confirm"),
+    path("assignments/<int:pk>/return/", views.assignment_return, name="assignment_return"),
+    path("assignments/<int:pk>/cancel/", views.assignment_cancel, name="assignment_cancel"),
+    path("assignments/<int:pk>/comment/", views.assignment_comment, name="assignment_comment"),
+    path("assignments/<int:pk>/files/<int:comment_pk>/", views.assignment_file, name="assignment_file"),
+]

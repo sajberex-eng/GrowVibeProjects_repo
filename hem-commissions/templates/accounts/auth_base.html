@@ -1,0 +1,18 @@
+{% load static %}<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Вход{% endblock %} — Комиссии Центра гематологии</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+<div class="auth-page">
+  <div class="card auth-card">
+    <div class="brand"><div class="brand-mark" style="color:#fff">К</div><div>Комиссии<small>Центр гематологии</small></div></div>
+    {% if messages %}<ul class="messages">{% for m in messages %}<li class="{{ m.tags }}">{{ m }}</li>{% endfor %}</ul>{% endif %}
+    {% block content %}{% endblock %}
+  </div>
+</div>
+</body>
+</html>

@@ -1,0 +1,35 @@
+{% load ui %}
+<div class="card">
+  <div class="card-head"><h2>Реестр приказов</h2>
+    {% if manage %}<a class="small" href="?tab=composition">Сформировать из проекта состава →</a>{% endif %}</div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Приказ</th><th>Номер</th><th>Дата подписания</th><th>Статус</th><th>Изменения состава</th><th>Файлы</th>{% if manage %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for o in orders %}
+    <tr class="{% if o.status == 'cancelled' %}row-muted{% endif %}">
+      <td>{{ o.title }}<div class="small muted">создан {{ o.created_at|local_dt:"%d.%m.%Y" }}{% if o.created_by %}, {{ o.created_by.short_name }}{% endif %}</div></td>
+      <td>{{ o.number|default:"—" }}</td>
+      <td class="nowrap">{{ o.signed_on|date:"d.m.Y"|default:"—" }}</td>
+      <td>{% status_badge o %}</td>
+      <td class="small">{% for ch in o.change_items %}<div>{{ ch.get_action_display }}: {{ ch.user.short_name }}</div>{% empty %}—{% endfor %}</td>
+      <td class="small nowrap">
+        {% if manage and o.draft_file %}<div><a href="{% url 'committees:order_draft' commission.pk o.pk %}">Проект (DOCX)</a></div>{% endif %}
+        {% if o.scan_file %}<div><a href="{% url 'committees:order_scan' commission.pk o.pk %}">Скан (PDF)</a></div>{% endif %}
+      </td>
+      {% if manage %}
+      <td class="nowrap">
+        {% if o.status == 'draft' %}
+        <a class="btn btn-sm btn-primary" href="{% url 'committees:order_register' commission.pk o.pk %}">Зарегистрировать подписанный</a>
+        <form class="inline" method="post" action="{% url 'committees:order_regenerate' commission.pk o.pk %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Обновить DOCX</button></form>
+        <form class="inline" method="post" action="{% url 'committees:order_cancel' commission.pk o.pk %}">{% csrf_token %}<button class="btn btn-sm btn-danger" type="submit" data-confirm="Отменить проект приказа? Изменения вернутся в проект состава.">Отменить</button></form>
+        {% endif %}
+      </td>
+      {% endif %}
+    </tr>
+    {% empty %}<tr><td colspan="7" class="empty">Приказов нет.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% if manage %}
+<div class="callout info small">Порядок: 1) добавьте изменения на вкладке «Состав»; 2) сформируйте проект приказа и скачайте DOCX; 3) после подписания руководителем загрузите скан PDF, укажите номер и дату — состав изменится с даты подписания, участники получат уведомление.</div>
+{% endif %}

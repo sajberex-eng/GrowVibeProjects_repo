@@ -1,0 +1,68 @@
+{% load static ui %}<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Комиссии{% endblock %} — Центр гематологии</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%239b1c31'/><text x='16' y='22' font-size='16' text-anchor='middle' fill='white' font-family='Arial' font-weight='700'>К</text></svg>">
+</head>
+<body>
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <div class="brand"><div class="brand-mark">К</div><div>Комиссии<small>Центр гематологии</small></div></div>
+    {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+    <nav class="nav">
+      <a href="{% url 'dashboard' %}" class="{% if url_name == 'dashboard' %}active{% endif %}">Главная</a>
+      <a href="{% url 'committees:list' %}" class="{% if ns == 'committees' %}active{% endif %}">Комиссии</a>
+      <a href="{% url 'meetings:calendar' %}" class="{% if ns == 'meetings' %}active{% endif %}">Заседания и график</a>
+      <a href="{% url 'voting:list' %}" class="{% if ns == 'voting' %}active{% endif %}">Голосования{% open_votes_count user as ov %}{% if ov %}<span class="count">{{ ov }}</span>{% endif %}</a>
+      <a href="{% url 'protocols:list' %}" class="{% if ns == 'protocols' and url_name != 'assignments' and 'assignment' not in url_name %}active{% endif %}">Протоколы</a>
+      <a href="{% url 'protocols:assignments' %}" class="{% if 'assignment' in url_name %}active{% endif %}">Поручения</a>
+      <a href="{% url 'reports:index' %}" class="{% if ns == 'reports' %}active{% endif %}">Отчёты</a>
+      <div class="nav-section">Личное</div>
+      <a href="{% url 'notifications:list' %}" class="{% if ns == 'notifications' %}active{% endif %}">Уведомления{% if unread_notifications %}<span class="count">{{ unread_notifications }}</span>{% endif %}</a>
+      <a href="{% url 'accounts:profile' %}" class="{% if url_name == 'profile' %}active{% endif %}">Профиль</a>
+      {% if user.is_admin %}
+      <div class="nav-section">Администрирование</div>
+      <a href="{% url 'accounts:user_list' %}" class="{% if url_name == 'user_list' or url_name == 'user_edit' or url_name == 'user_create' %}active{% endif %}">Пользователи</a>
+      <a href="{% url 'committees:legal_monitor' %}" class="{% if url_name == 'legal_monitor' %}active{% endif %}">Мониторинг НПА</a>
+      <a href="{% url 'audit:list' %}" class="{% if ns == 'audit' %}active{% endif %}">Журнал аудита</a>
+      <a href="{% url 'admin:index' %}">Справочники и шаблоны</a>
+      <a href="{% url 'api-docs' %}">API</a>
+      {% endif %}
+    </nav>
+    {% endwith %}
+  </aside>
+  <div class="main">
+    <header class="topbar">
+      <button class="btn btn-ghost menu-toggle" type="button" aria-label="Меню" onclick="document.body.classList.toggle('nav-open')">☰</button>
+      <form class="search" action="{% url 'search' %}" method="get" role="search">
+        <input type="search" name="q" value="{{ request.GET.q|default:'' }}" placeholder="Поиск по протоколам, решениям, поручениям, НПА" aria-label="Поиск">
+      </form>
+      <div class="user">
+        <a href="{% url 'notifications:list' %}" title="Уведомления" aria-label="Уведомления">🔔{% if unread_notifications %} <span class="badge badge-red">{{ unread_notifications }}</span>{% endif %}</a>
+        <span class="user-name">{{ user.short_name }}</span>
+        <form method="post" action="{% url 'accounts:logout' %}" class="inline">{% csrf_token %}<button class="btn btn-sm" type="submit">Выйти</button></form>
+      </div>
+    </header>
+    <main class="content">
+      {% if messages %}
+      <ul class="messages">{% for message in messages %}<li class="{{ message.tags }}">{{ message }}</li>{% endfor %}</ul>
+      {% endif %}
+      {% block content %}{% endblock %}
+    </main>
+  </div>
+</div>
+<script>
+document.addEventListener('click', function (e) {
+  if (document.body.classList.contains('nav-open') && !e.target.closest('#sidebar') && !e.target.closest('.menu-toggle')) {
+    document.body.classList.remove('nav-open');
+  }
+  var el = e.target.closest('[data-confirm]');
+  if (el && !window.confirm(el.getAttribute('data-confirm'))) { e.preventDefault(); }
+});
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

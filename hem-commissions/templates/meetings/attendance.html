@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Присутствие{% endblock %}
+{% block content %}
+<style>
+  .att-table select { min-width: 150px; }
+  @media (max-width: 700px) {
+    .att-table thead { display:none; }
+    .att-table tr { display:block; border-bottom:1px solid var(--border); padding:8px 0; }
+    .att-table td { display:block; border:0; padding:3px 0; }
+  }
+</style>
+{% include "meetings/_crumbs.html" with back_tab="participants" %}
+<div class="page-head"><div><h1>Список присутствующих</h1><div class="sub">{{ meeting }}</div></div>
+  <div class="actions"><button type="button" class="btn btn-sm" onclick="document.querySelectorAll('select[data-status]').forEach(function(s){ if(!s.value){ s.value='present'; } })">Отметить всех неотмеченных «очно»</button></div></div>
+<div class="card">
+  <p class="quorum">Кворум: <b>{{ quorum.present }}</b> из {{ quorum.total }}, требуется {{ quorum.needed }} ({{ meeting.commission.meeting_quorum_label }}) —
+    {% if quorum.reached %}{% badge "достигнут" "green" %}{% else %}{% badge "не достигнут" "red" %}{% endif %}
+    <span class="small muted">· учитываются члены состава на дату заседания; приглашённые в кворум не входят</span></p>
+  <form method="post">
+    {% csrf_token %}
+    <div class="table-wrap"><table class="table att-table">
+      <thead><tr><th>Участник</th><th>Роль</th><th>Отметка</th><th>Причина отсутствия</th></tr></thead>
+      <tbody>
+      {% for row in rows %}
+      <tr>
+        <td><b>{{ row.user.full_name }}</b><div class="small muted">{{ row.user.position|default:"" }}{% if row.user.city %} · {{ row.user.city }}{% endif %}</div></td>
+        <td>{{ row.role }}</td>
+        <td><select name="status_{{ row.user.pk }}" data-status aria-label="Отметка">
+          <option value="">— не отмечено —</option>
+          {% for value, label in statuses %}<option value="{{ value }}" {% if row.record.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select></td>
+        <td><select name="reason_{{ row.user.pk }}" aria-label="Причина">
+          <option value="">—</option>
+          {% for r in reasons %}<option value="{{ r.pk }}" {% if row.record.reason_id == r.pk %}selected{% endif %}>{{ r.name }}{% if not r.is_excused %} (неуважительная){% endif %}</option>{% endfor %}
+        </select></td>
+      </tr>
+      {% empty %}<tr><td colspan="4" class="empty">Состав комиссии на дату заседания не сформирован</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+    <div class="actions" style="margin-top:12px">
+      <button class="btn btn-primary" type="submit">Сохранить и пересчитать кворум</button>
+      <a class="btn btn-ghost" href="{% url 'meetings:detail' meeting.pk %}?tab=participants">Назад</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

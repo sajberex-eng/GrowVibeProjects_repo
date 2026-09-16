@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+{% include "meetings/_crumbs.html" %}
+<div class="page-head"><div><h1>{{ title }}</h1><div class="sub">{{ meeting }}</div></div></div>
+<div class="card form-narrow">
+  {% if item.is_control_item %}<p class="callout info">Пункт «Контроль исполнения решений» формируется автоматически из открытых поручений. Кнопка «Обновить контроль исполнения» перезапишет пояснение.</p>{% endif %}
+  {% if meeting.agenda_status != 'draft' %}<p class="callout">Повестка {{ meeting.get_agenda_status_display|lower }}. После изменения потребуется повторное утверждение председателем.</p>{% endif %}
+  {% if meeting.commission.handles_patient_cases %}<p class="callout info">Комиссия рассматривает клинические случаи: указывайте только внутренний ID пациента из МИС. ФИО, ИИН и дату рождения не вносить ни в одно поле.</p>{% endif %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "partials/form.html" with form=form %}
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Сохранить</button>
+      {% if not item %}<button class="btn" type="submit" name="add_another" value="1">Сохранить и добавить ещё</button>{% endif %}
+      <a class="btn btn-ghost" href="{% url 'meetings:detail' meeting.pk %}">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

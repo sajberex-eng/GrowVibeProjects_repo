@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Поиск{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Поиск</h1>
+  {% if q %}<div class="sub">«{{ q }}» — найдено: {{ total }}</div>{% endif %}</div></div>
+{% if not q or q|length < 2 %}
+<p class="muted">Введите не менее двух символов. Поиск идёт по протоколам (в том числе по ID пациента), решениям, поручениям и НПА комиссий, к которым у вас есть доступ.</p>
+{% else %}
+{% if results.protocols %}
+<div class="card"><h2>Протоколы</h2><ul class="list-plain">
+  {% for item in results.protocols %}
+  <li><a href="{% url 'protocols:detail' item.protocol.pk %}">{{ item.protocol }}</a> — {{ item.position }}. {{ item.title }}
+    {% if item.patient_id %}{% badge item.patient_id "blue" %}{% endif %} {% status_badge item.protocol %}</li>
+  {% endfor %}</ul></div>
+{% endif %}
+{% if results.decisions %}
+<div class="card"><h2>Решения</h2><ul class="list-plain">
+  {% for d in results.decisions %}
+  <li><a href="{% url 'protocols:detail' d.protocol.pk %}">{{ d.protocol }}</a><div class="text-block">{{ d.text|truncatechars:300 }}</div></li>
+  {% endfor %}</ul></div>
+{% endif %}
+{% if results.assignments %}
+<div class="card"><h2>Поручения</h2><ul class="list-plain">
+  {% for a in results.assignments %}
+  <li><a href="{% url 'protocols:assignment_detail' a.pk %}">{{ a.text|truncatechars:160 }}</a>
+    <div class="small muted">{{ a.commission.short_name }} · {{ a.responsible_display }} · срок {{ a.due_date|date:"d.m.Y" }} {% status_badge a %}</div></li>
+  {% endfor %}</ul></div>
+{% endif %}
+{% if results.legal_acts %}
+<div class="card"><h2>НПА</h2><ul class="list-plain">
+  {% for act in results.legal_acts %}
+  <li><a href="{% url 'committees:detail' act.commission.pk %}?tab=legal">{{ act.commission.short_name }}</a> — {{ act.title }} {{ act.number }} {% status_badge act %}</li>
+  {% endfor %}</ul></div>
+{% endif %}
+{% if not total %}<p class="empty">Ничего не найдено.</p>{% endif %}
+{% endif %}
+{% endblock %}

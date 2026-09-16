@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Протокол заочного голосования{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'voting:list' %}">Голосования</a></div>
+<div class="page-head"><div><h1>Протокол заочного голосования</h1>
+  <div class="sub">Отметьте завершённые заочные голосования одной комиссии, которые войдут в протокол</div></div></div>
+
+<form method="get" class="filters">
+  <div class="field"><label for="p-commission">Комиссия</label>
+    <select id="p-commission" name="commission">
+      {% if not commission %}<option value="">— выберите —</option>{% endif %}
+      {% for c in managed %}<option value="{{ c.pk }}" {% if commission and commission.pk == c.pk %}selected{% endif %}>{{ c.short_name }} — {{ c.name }}</option>{% endfor %}
+    </select></div>
+  <button class="btn" type="submit">Показать</button>
+</form>
+
+{% if commission %}
+<div class="card">
+  <form method="post">{% csrf_token %}
+    <input type="hidden" name="commission" value="{{ commission.pk }}">
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th></th><th>Вопрос</th><th>Завершено</th><th>Итог</th><th class="num">За / против / возд.</th></tr></thead>
+      <tbody>
+      {% for s in sessions %}
+      <tr>
+        <td><input type="checkbox" name="sessions" value="{{ s.pk }}" id="s{{ s.pk }}" checked></td>
+        <td><label for="s{{ s.pk }}">{{ s.question }}</label> <a class="small" href="{% url 'voting:detail' s.pk %}">открыть</a></td>
+        <td class="nowrap">{{ s.closed_at|local_dt }}</td>
+        <td>{% status_badge s "outcome" %}</td>
+        <td class="num">{{ s.votes_for }} / {{ s.votes_against }} / {{ s.votes_abstain }}</td>
+      </tr>
+      {% empty %}<tr><td colspan="5" class="empty">Нет завершённых заочных голосований, не включённых в протокол.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+    {% if sessions %}<button class="btn btn-primary" type="submit" style="margin-top:12px">Сформировать протокол</button>{% endif %}
+  </form>
+</div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Поручение{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'protocols:assignments' %}">Поручения</a> / {{ a.commission.short_name }}</div>
+<div class="page-head"><div><h1>Поручение {% if a.is_overdue %}{% status_badge a override="overdue" %}{% endif %} {% status_badge a %}</h1>
+  <div class="sub">{{ a.commission.name }} · протокол № {{ protocol.number }} от {{ protocol.protocol_date|date:"d.m.Y" }}</div></div></div>
+
+{% if not active %}
+<div class="callout {% if protocol.status == 'annulled' %}danger{% else %}info{% endif %}">
+  {% if protocol.status == 'annulled' %}Протокол аннулирован.{% else %}Поручение вступит в силу после подписания протокола.{% endif %}</div>
+{% endif %}
+
+<div class="grid-2">
+  <div class="card">
+    <div class="text-block" style="margin-bottom:12px">{{ a.text }}</div>
+    <dl class="kv">
+      <dt>Ответственный</dt><dd>{{ a.responsible_display|default:"—" }}</dd>
+      {% if co_executors %}<dt>Соисполнители</dt><dd>{% for u in co_executors %}{{ u.short_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</dd>{% endif %}
+      <dt>Срок</dt><dd>{{ a.due_date|date:"d.m.Y" }}</dd>
+      {% if a.completed_on %}<dt>Дата исполнения</dt><dd>{{ a.completed_on|date:"d.m.Y" }}</dd>{% endif %}
+      {% if a.confirmed_by %}<dt>Подтвердил</dt><dd>{{ a.confirmed_by.short_name }}</dd>{% endif %}
+      {% if a.cancel_reason %}<dt>Причина снятия</dt><dd>{{ a.cancel_reason }}</dd>{% endif %}
+      <dt>Решение</dt><dd>{{ a.decision.number }} {{ a.decision.text|truncatechars:200 }}</dd>
+      <dt>Протокол</dt><dd>{% if can_view_protocol %}<a href="{% url 'protocols:detail' protocol.pk %}">№ {{ protocol.number }}</a>{% else %}№ {{ protocol.number }}{% endif %}, вопрос {{ a.decision.item.position }}</dd>
+    </dl>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Действия</h2></div>
+    {% if can_start %}
+    <form method="post" action="{% url 'protocols:assignment_start' a.pk %}">{% csrf_token %}<button class="btn" type="submit">Взять в работу</button></form>
+    {% endif %}
+    {% if can_report %}
+    <h3>Отметить исполнение</h3>
+    <form method="post" action="{% url 'protocols:assignment_report' a.pk %}" enctype="multipart/form-data">{% csrf_token %}
+      {% include "partials/form.html" with form=report_form %}
+      <button class="btn btn-primary" type="submit">Отправить на подтверждение</button></form>
+    {% endif %}
+    {% if can_review %}
+    <h3>Подтверждение исполнения</h3>
+    <p class="small">{% if a.completed_on and a.completed_on > a.due_date %}Исполнено позже срока — статус будет «Исполнено с нарушением срока».{% else %}Исполнено в срок.{% endif %}</p>
+    <form method="post" action="{% url 'protocols:assignment_confirm' a.pk %}">{% csrf_token %}
+      <div class="field"><label for="c-text">Комментарий (необязательно)</label><textarea id="c-text" name="text" rows="2"></textarea></div>
+      <button class="btn btn-primary" type="submit">Подтвердить исполнение</button></form>
+    <form method="post" action="{% url 'protocols:assignment_return' a.pk %}" style="margin-top:10px">{% csrf_token %}
+      <div class="field"><label for="r-text">Что доработать *</label><textarea id="r-text" name="text" rows="2" required></textarea></div>
+      <button class="btn" type="submit">Вернуть в работу</button></form>
+    {% endif %}
+    {% if can_cancel %}
+    <details style="margin-top:10px"><summary>Снять поручение</summary>
+      <form method="post" action="{% url 'protocols:assignment_cancel' a.pk %}">{% csrf_token %}
+        {% include "partials/form.html" with form=reason_form %}
+        <button class="btn btn-danger" type="submit" data-confirm="Снять поручение с контроля?">Снять</button></form>
+    </details>
+    {% endif %}
+    {% if not can_start and not can_report and not can_review and not can_cancel %}<p class="muted">Нет доступных действий.</p>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>История и комментарии</h2></div>
+  <ul class="list-plain">
+    {% for c in comments %}
+    <li><b>{{ c.author.short_name }}</b> <span class="muted small">{{ c.created_at|local_dt }}</span>
+      {% if c.status_change == 'returned' %}{% badge "возвращено в работу" "amber" %}{% elif c.status_change %}{% badge c.status_label "blue" %}{% endif %}
+      {% if c.text %}<div class="text-block">{{ c.text }}</div>{% endif %}
+      {% if c.file %}<a class="small" href="{% url 'protocols:assignment_file' a.pk c.pk %}">📎 {{ c.file_name }}</a>{% endif %}</li>
+    {% empty %}<li class="empty">Комментариев нет.</li>{% endfor %}
+  </ul>
+  <form method="post" action="{% url 'protocols:assignment_comment' a.pk %}" enctype="multipart/form-data" style="margin-top:12px">{% csrf_token %}
+    {% include "partials/form.html" with form=comment_form %}
+    <button class="btn" type="submit">Добавить комментарий</button></form>
+</div>
+{% endblock %}

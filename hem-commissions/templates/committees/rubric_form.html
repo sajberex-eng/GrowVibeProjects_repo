@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Рубрика — {{ commission.short_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'committees:list' %}">Комиссии</a> / <a href="{% url 'committees:detail' commission.pk %}?tab=settings">{{ commission.short_name }}</a> / Рубрикатор</div>
+<div class="page-head"><h1>{% if rubric %}Изменение рубрики{% else %}Новая рубрика{% endif %}</h1></div>
+<div class="card form-narrow">
+  <form method="post">{% csrf_token %}
+    {% include "partials/form.html" with form=form %}
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Сохранить</button>
+      <a class="btn btn-ghost" href="{% url 'committees:detail' commission.pk %}?tab=settings">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

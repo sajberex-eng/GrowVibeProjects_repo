@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Профиль{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>{{ user.full_name }}</h1>
+  <div class="sub">{{ user.position|default:"" }}{% if user.department %} · {{ user.department }}{% endif %}{% if user.city %} · {{ user.city }}{% endif %}</div></div>
+  <div class="actions"><a class="btn" href="{% url 'accounts:password_change' %}">Сменить пароль</a></div>
+</div>
+<form method="post">{% csrf_token %}
+<div class="grid-2">
+  <div class="card">
+    <h2>Контакты</h2>
+    {% include "partials/form.html" with form=form %}
+  </div>
+  <div class="card">
+    <h2>Участие в комиссиях</h2>
+    {% if records or observed %}
+    <ul class="list-plain">
+      {% for r in records %}
+      <li><a href="{% url 'committees:detail' r.commission.pk %}"><b>{{ r.commission.short_name }}</b></a> — {{ r.get_role_display }}
+        <div class="small muted">с {{ r.start_date|date:"d.m.Y" }}{% if r.end_date %} по {{ r.end_date|date:"d.m.Y" }}{% endif %}{% if r.start_order %} · {{ r.start_order }}{% endif %}</div></li>
+      {% endfor %}
+      {% for o in observed %}<li><a href="{% url 'committees:detail' o.commission.pk %}"><b>{{ o.commission.short_name }}</b></a> — наблюдатель</li>{% endfor %}
+    </ul>
+    {% else %}<p class="empty">Вы не входите в состав комиссий.</p>{% endif %}
+  </div>
+</div>
+<div class="card" style="margin-top:16px">
+  <h2>Уведомления</h2>
+  <p class="muted small">Уведомления внутри системы приходят всегда. Критические события (подпись, голосование, поручения) по e-mail отключить нельзя. WhatsApp работает, если администратор включил его для комиссии и вы дали согласие выше.</p>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Событие</th><th>E-mail</th><th>WhatsApp</th></tr></thead>
+    <tbody>
+    {% for row in pref_rows %}
+    <tr><td>{{ row.label }}{% if row.critical %} <span class="badge badge-amber">обязательно</span>{% endif %}</td>
+      <td><input type="checkbox" name="email_{{ row.event }}" {% if row.email or row.critical %}checked{% endif %} {% if row.critical %}disabled{% endif %}></td>
+      <td><input type="checkbox" name="wa_{{ row.event }}" {% if row.whatsapp %}checked{% endif %}></td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</div>
+<button class="btn btn-primary" type="submit">Сохранить</button>
+</form>
+{% endblock %}

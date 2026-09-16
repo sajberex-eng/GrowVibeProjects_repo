@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Уведомления{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Уведомления</h1>
+    <div class="sub">Способы доставки настраиваются в <a href="{% url 'accounts:profile' %}">профиле</a></div></div>
+  <div class="actions">
+    {% if unread_notifications %}
+    <form class="inline" method="post" action="{% url 'notifications:read_all' %}">{% csrf_token %}
+      <button class="btn" type="submit">Отметить все прочитанными</button></form>
+    {% endif %}
+  </div>
+</div>
+<div class="tabs">
+  <a href="{% url 'notifications:list' %}" class="{% if not unread_only %}active{% endif %}">Все</a>
+  <a href="{% url 'notifications:list' %}?unread=1" class="{% if unread_only %}active{% endif %}">Непрочитанные{% if unread_notifications %} ({{ unread_notifications }}){% endif %}</a>
+</div>
+<div class="card">
+  <ul class="list-plain">
+    {% for n in page %}
+    <li>
+      {% if not n.read_at %}{% badge "новое" "blue" %}{% endif %}
+      <a href="{% url 'notifications:read' n.pk %}">{% if n.read_at %}{{ n.title }}{% else %}<b>{{ n.title }}</b>{% endif %}</a>
+      <div class="small muted">{{ n.created_at|local_dt }} · {{ n.get_event_display }}{% if n.commission %} · {{ n.commission.short_name }}{% endif %}</div>
+      {% if n.body %}<div class="small text-block">{{ n.body|truncatechars:400 }}</div>{% endif %}
+    </li>
+    {% empty %}
+    <li class="empty">Уведомлений нет.</li>
+    {% endfor %}
+  </ul>
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,170 @@
+{% extends "base.html" %}
+{% load ui voting_tags %}
+{% block title %}Отчёты{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Отчёты о работе комиссий</h1>
+    <div class="sub">Формальный и содержательный отчёт за полугодие, год или произвольный период</div></div>
+  <div class="actions"><a class="btn" href="{% url 'reports:signed_list' %}">Подписанные отчёты</a></div>
+</div>
+
+<form class="filters" method="get">
+  {% if form.non_field_errors %}<div class="form-errors" style="width:100%">{% for e in form.non_field_errors %}<div>{{ e }}</div>{% endfor %}</div>{% endif %}
+  <div class="field"><label for="{{ form.commission.id_for_label }}">Комиссия</label>{{ form.commission }}</div>
+  <div class="field"><label for="{{ form.period.id_for_label }}">Период</label>{{ form.period }}</div>
+  <div class="field"><label for="{{ form.year.id_for_label }}">Год</label>{{ form.year }}</div>
+  <div class="field"><label for="{{ form.date_from.id_for_label }}">С (произв.)</label>{{ form.date_from }}</div>
+  <div class="field"><label for="{{ form.date_to.id_for_label }}">По (произв.)</label>{{ form.date_to }}</div>
+  <button class="btn btn-primary" type="submit">Сформировать</button>
+</form>
+
+{% if report %}
+<div class="card">
+  <div class="card-head">
+    <div><h2>{{ title }}</h2><div class="muted small">{{ period_label }}</div></div>
+    <div class="actions">
+      <a class="btn btn-sm" href="{% url 'reports:export_xlsx' %}?{{ query }}">Excel</a>
+      <a class="btn btn-sm" href="{% url 'reports:export_pdf' %}?{{ query }}">PDF</a>
+      {% if can_sign %}
+      <form class="inline" method="post" action="{% url 'reports:sign' %}">{% csrf_token %}
+        <input type="hidden" name="commission" value="{{ single.pk }}">
+        <input type="hidden" name="period" value="{{ form.cleaned_data.period }}">
+        <input type="hidden" name="year" value="{{ form.cleaned_data.year }}">
+        <input type="hidden" name="date_from" value="{{ report.date_from|date:'Y-m-d' }}">
+        <input type="hidden" name="date_to" value="{{ report.date_to|date:'Y-m-d' }}">
+        <input type="hidden" name="step" value="send">
+        <button class="btn btn-sm btn-primary" type="submit">Подписать отчёт</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% with t=report.totals %}
+  <div class="grid-4">
+    <div class="stat"><div class="value">{{ t.meetings.held }} / {{ t.meetings.total }}</div><div class="label">заседаний проведено / запланировано</div></div>
+    <div class="stat"><div class="value">{{ t.absentee_votings }}</div><div class="label">заочных голосований</div></div>
+    <div class="stat"><div class="value">{{ t.decisions_count }}</div><div class="label">решений принято</div></div>
+    <div class="stat {% if t.assignments.overdue %}warn{% endif %}"><div class="value">{{ t.assignments.overdue }}</div><div class="label">просроченных поручений</div></div>
+  </div>
+  {% endwith %}
+</div>
+
+{% if report.commissions|length > 1 %}
+<div class="card">
+  <div class="card-head"><h2>Сводно по комиссиям</h2></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Комиссия</th><th class="num">Заседаний</th><th class="num">Проведено</th><th class="num">Переносилось</th><th class="num">Отменено</th><th class="num">Внеочередных</th><th class="num">Заочных</th><th class="num">Посещаемость</th><th class="num">С кворумом / без</th><th class="num">Решений</th><th class="num">Поручений (просрочено)</th></tr></thead>
+    <tbody>
+    {% for s in report.commissions %}
+    <tr><td><a href="#c{{ s.commission.pk }}">{{ s.commission.short_name }}</a></td>
+      <td class="num">{{ s.meetings.total }}</td><td class="num">{{ s.meetings.held }}</td><td class="num">{{ s.meetings.postponed }}</td>
+      <td class="num">{{ s.meetings.cancelled }}</td><td class="num">{{ s.meetings.extra }}</td><td class="num">{{ s.absentee_votings }}</td>
+      <td class="num">{% if s.avg_attendance is not None %}{{ s.avg_attendance }} %{% else %}—{% endif %}</td>
+      <td class="num">{{ s.meetings.quorum_reached }} / {{ s.meetings.quorum_not_reached }}</td>
+      <td class="num">{{ s.decisions_count }}</td><td class="num">{{ s.assignments.total }} ({{ s.assignments.overdue }})</td></tr>
+    {% empty %}<tr><td colspan="11" class="empty">Нет доступных комиссий</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endif %}
+
+{% for s in report.commissions %}
+<div class="card" id="c{{ s.commission.pk }}">
+  <div class="card-head"><h2>{{ s.commission.name }}</h2>
+    {% if s.chairman %}<span class="muted small">Председатель: {{ s.chairman.full_name }}</span>{% endif %}</div>
+
+  <h3>1. Формальный отчёт</h3>
+  <div class="grid-2">
+    <dl class="kv">
+      <dt>Заседаний запланировано</dt><dd>{{ s.meetings.total }}</dd>
+      <dt>Проведено</dt><dd>{{ s.meetings.held }}</dd>
+      <dt>Переносилось</dt><dd>{{ s.meetings.postponed }}</dd>
+      <dt>Отменено</dt><dd>{{ s.meetings.cancelled }}</dd>
+      <dt>Предстоит / не отмечено</dt><dd>{{ s.meetings.upcoming }}</dd>
+      <dt>Из них внеочередных</dt><dd>{{ s.meetings.extra }} (проведено {{ s.meetings.extra_held }})</dd>
+      <dt>Заочных голосований</dt><dd>{{ s.absentee_votings }}</dd>
+    </dl>
+    <dl class="kv">
+      <dt>Средняя посещаемость</dt><dd>{% if s.avg_attendance is not None %}{{ s.avg_attendance }} %{% else %}—{% endif %}</dd>
+      <dt>Кворум достигнут / нет</dt><dd>{{ s.meetings.quorum_reached }} / {{ s.meetings.quorum_not_reached }}</dd>
+      <dt>Протоколов подписано</dt><dd>{{ s.protocol_timeliness.signed }}{% if s.protocol_timeliness.unsigned %}; не подписано {{ s.protocol_timeliness.unsigned }}{% endif %}</dd>
+      <dt>Срок подписания протокола</dt><dd>{% if s.protocol_timeliness.avg_days is not None %}в среднем {{ s.protocol_timeliness.avg_days }} дн., макс. {{ s.protocol_timeliness.max_days }} дн.{% else %}—{% endif %}</dd>
+      <dt>Особых мнений</dt><dd>{{ s.dissents }}</dd>
+    </dl>
+  </div>
+
+  {% if s.meeting_rows %}
+  <details style="margin-top:10px"><summary>Заседания ({{ s.meeting_rows|length }})</summary>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Дата</th><th>Тип</th><th>Статус</th><th>Кворум</th></tr></thead>
+    <tbody>{% for r in s.meeting_rows %}
+    <tr><td class="nowrap">{% safe_url 'meetings:detail' r.meeting.pk as murl %}{% if murl %}<a href="{{ murl }}">{{ r.meeting.starts_at|local_dt }}</a>{% else %}{{ r.meeting.starts_at|local_dt }}{% endif %}</td>
+      <td>{{ r.meeting.get_kind_display }}</td>
+      <td>{% status_badge r.meeting %}{% if r.rescheduled %} {% badge "переносилось" "amber" %}{% endif %}</td>
+      <td>{% if r.quorum %}{{ r.quorum.present }} из {{ r.quorum.total }} {% if r.quorum.reached %}{% badge "есть" "green" %}{% else %}{% badge "нет" "red" %}{% endif %}{% else %}—{% endif %}</td></tr>
+    {% endfor %}</tbody>
+  </table></div></details>
+  {% endif %}
+
+  <h3>Посещаемость</h3>
+  {% if s.attendance %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Член комиссии</th><th>Роль</th><th class="num">Заседаний</th><th class="num">Очно</th><th class="num">Онлайн</th><th class="num">Отс. (уваж.)</th><th class="num">Отс. (неуваж.)</th><th class="num">Не отмечено</th><th class="num">%</th></tr></thead>
+    <tbody>{% for r in s.attendance %}
+    <tr><td>{{ r.name }}</td><td>{{ r.role }}</td><td class="num">{{ r.meetings }}</td><td class="num">{{ r.present }}</td><td class="num">{{ r.online }}</td>
+      <td class="num">{{ r.absent_excused }}</td><td class="num">{{ r.absent }}</td><td class="num">{{ r.unmarked }}</td><td class="num">{{ r.percent|default_if_none:"—" }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div>
+  {% else %}<p class="empty">Проведённых заседаний в периоде нет.</p>{% endif %}
+
+  <h3>2. Содержательный отчёт</h3>
+  <div class="grid-2">
+    <div>
+      <h4>Рассмотренные вопросы ({{ s.questions_total }})</h4>
+      {% if s.rubrics %}
+      <table class="table"><tbody>{% for r in s.rubrics %}<tr><td>{{ r.name }}</td><td class="num">{{ r.count }}</td></tr>{% endfor %}</tbody></table>
+      {% else %}<p class="empty">Нет вопросов.</p>{% endif %}
+    </div>
+    <div>
+      <h4>Поручения ({{ s.assignments.total }})</h4>
+      <table class="table"><tbody>
+        {% for key, label in state_labels.items %}<tr><td>{{ label }}</td><td class="num">{{ s.assignments|get_item:key }}</td></tr>{% endfor %}
+      </tbody></table>
+    </div>
+  </div>
+
+  {% if s.assignments_by_responsible %}
+  <details><summary>Поручения по ответственным</summary>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Ответственный</th><th class="num">Всего</th><th class="num">В срок</th><th class="num">С нарушением</th><th class="num">Просрочено</th><th class="num">В работе</th><th class="num">Снято</th></tr></thead>
+    <tbody>{% for r in s.assignments_by_responsible %}
+    <tr><td>{{ r.name }}</td><td class="num">{{ r.total }}</td><td class="num">{{ r.done_on_time }}</td><td class="num">{{ r.done_late }}</td>
+      <td class="num">{{ r.overdue }}</td><td class="num">{{ r.open }}</td><td class="num">{{ r.cancelled }}</td></tr>
+    {% endfor %}</tbody>
+  </table></div></details>
+  {% endif %}
+
+  <h4>Принятые решения ({{ s.decisions_count }})</h4>
+  {% if s.decisions %}
+  <details><summary>Показать список</summary>
+  <ul class="list-plain">{% for d in s.decisions %}
+    <li><span class="muted small">Протокол № {{ d.protocol.number|default:"б/н" }} от {{ d.protocol.protocol_date|date:"d.m.Y" }}{% if d.number %} · решение {{ d.number }}{% endif %}</span>
+      <div class="text-block">{{ d.text }}</div></li>
+  {% endfor %}</ul></details>
+  {% else %}<p class="empty">Решений нет.</p>{% endif %}
+
+  <h4>Нормативная база</h4>
+  <p>Всего НПА: <b>{{ s.legal.total }}</b> · актуальны: {{ s.legal.actual }} · утратили силу: {{ s.legal.lost_force }} · требуют проверки: {{ s.legal.needs_check }} · последняя проверка: {{ s.legal.last_check|local_dt }}</p>
+
+  <h4>Изменения состава</h4>
+  {% if s.composition_changes or s.orders %}
+  <ul class="list-plain">
+    {% for c in s.composition_changes %}<li>{{ c.applied_on|date:"d.m.Y" }} — {{ c.get_action_display }}: {{ c.user }}{% if c.new_role %} ({{ c.get_new_role_display }}){% endif %}{% if c.order %} · {{ c.order }}{% endif %}</li>{% endfor %}
+    {% for o in s.orders %}<li>{{ o.signed_on|date:"d.m.Y" }} — подписан {{ o }} «{{ o.title }}»</li>{% endfor %}
+  </ul>
+  {% else %}<p class="empty">Изменений состава в периоде не было.</p>{% endif %}
+</div>
+{% empty %}
+<p class="empty">Нет доступных вам комиссий.</p>
+{% endfor %}
+{% endif %}
+{% endblock %}

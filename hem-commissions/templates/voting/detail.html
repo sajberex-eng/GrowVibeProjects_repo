@@ -1,0 +1,168 @@
+{% extends "base.html" %}
+{% load ui voting_tags %}
+{% block title %}Голосование{% endblock %}
+{% block content %}
+<div class="breadcrumbs">
+  <a href="{% url 'voting:list' %}">Голосования</a> ·
+  {% safe_url 'committees:detail' commission.pk as commission_url %}{% if commission_url %}<a href="{{ commission_url }}">{{ commission.short_name }}</a>{% else %}{{ commission.short_name }}{% endif %}
+</div>
+<div class="page-head">
+  <div>
+    <h1>{{ session.question }}</h1>
+    <div class="sub">
+      {% status_badge session %} {% if session.outcome %}{% status_badge session "outcome" %}{% endif %}
+      {% if session.is_absentee %}{% badge "заочное голосование" "blue" %}{% else %}{% badge "вопрос повестки заседания" "blue" %}{% endif %}
+    </div>
+  </div>
+  {% if can_manage %}
+  <div class="actions">
+    {% if session.status == 'draft' %}
+      <a class="btn" href="{% url 'voting:edit' session.pk %}">Изменить</a>
+      <form class="inline" method="post" action="{% url 'voting:open' session.pk %}">{% csrf_token %}
+        <button class="btn btn-primary" type="submit" data-confirm="Открыть голосование? Члены комиссии получат письмо со ссылкой.">Открыть голосование</button></form>
+    {% endif %}
+    {% if session.status == 'open' %}
+      <form class="inline" method="post" action="{% url 'voting:close' session.pk %}">{% csrf_token %}
+        <button class="btn" type="submit" data-confirm="Завершить голосование досрочно и подвести итоги?">Завершить сейчас</button></form>
+    {% endif %}
+    {% if session.status == 'draft' or session.status == 'open' %}
+      <form class="inline" method="post" action="{% url 'voting:cancel' session.pk %}">{% csrf_token %}
+        <button class="btn btn-danger" type="submit" data-confirm="Отменить голосование?">Отменить</button></form>
+    {% endif %}
+    {% if session.status == 'closed' and session.is_absentee %}
+      <a class="btn" href="{% url 'voting:absentee_protocol' %}?commission={{ commission.pk }}">Протокол заочного голосования</a>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-head"><h2>Вопрос</h2></div>
+    <dl class="kv">
+      <dt>Комиссия</dt><dd>{{ commission.name }}</dd>
+      {% if session.meeting %}
+      <dt>Заседание</dt><dd>{% safe_url 'meetings:detail' session.meeting_id as meeting_url %}{% if meeting_url %}<a href="{{ meeting_url }}">{{ session.meeting }}</a>{% else %}{{ session.meeting }}{% endif %}</dd>
+      {% endif %}
+      {% if session.agenda_item %}<dt>Вопрос повестки</dt><dd>{{ session.agenda_item }}</dd>{% endif %}
+      <dt>Окончание</dt><dd>{{ session.deadline|local_dt }}{% if session.status == 'open' %} <span class="muted">({{ session.deadline|time_left }})</span>{% endif %}</dd>
+      {% if session.opened_at %}<dt>Открыто</dt><dd>{{ session.opened_at|local_dt }}</dd>{% endif %}
+      {% if session.closed_at %}<dt>Завершено</dt><dd>{{ session.closed_at|local_dt }}</dd>{% endif %}
+      {% if session.initiated_by %}<dt>Инициатор</dt><dd>{{ session.initiated_by.short_name }}</dd>{% endif %}
+    </dl>
+    {% if session.description %}<h3>Пояснение / проект решения</h3><div class="text-block">{{ session.description }}</div>{% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Кворум</h2><span class="muted small">{{ commission.vote_quorum_label }}</span></div>
+    <p>Проголосовали <b>{{ progress.voted }}</b> из <b>{{ progress.total }}</b>; для кворума нужно <b>{{ progress.needed }}</b>.
+      {% if session.status != 'draft' %}{% if progress.reached %}{% badge "кворум есть" "green" %}{% else %}{% badge "кворума пока нет" "amber" %}{% endif %}{% endif %}</p>
+    <div class="bar" title="{{ progress.percent }}%"><span style="width: {{ progress.percent }}%"></span></div>
+    <p class="small muted">Решение принимается, если кворум набран и «за» проголосовали более половины участвовавших в голосовании.</p>
+    {% if session.status == 'draft' %}<p class="small muted">Список голосующих зафиксируется в момент открытия — по действующему составу комиссии.</p>{% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Материалы</h2></div>
+  {% if materials %}
+  <ul class="list-plain">
+    {% for m in materials %}
+    <li><a href="{% url 'voting:material_download' m.pk %}" {% if m.url %}target="_blank" rel="noopener"{% endif %}>{{ m.title }}</a>
+      <span class="muted small">{% if m.file %}{{ m.file_name }}{% else %}ссылка{% endif %}</span>
+      {% if material_form %}
+      <form class="inline" method="post" action="{% url 'voting:material_delete' m.pk %}">{% csrf_token %}<button class="btn btn-sm btn-ghost" data-confirm="Удалить материал?">Удалить</button></form>
+      {% endif %}
+    </li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="empty">Материалов нет.</p>{% endif %}
+  {% if material_form %}
+  <form method="post" enctype="multipart/form-data" action="{% url 'voting:material_add' session.pk %}">{% csrf_token %}
+    {% include "partials/form.html" with form=material_form %}
+    <button class="btn" type="submit">Добавить материал</button>
+  </form>
+  {% endif %}
+</div>
+
+{% if is_eligible or my_vote %}
+<div class="card">
+  <div class="card-head"><h2>Ваш голос</h2></div>
+  {% if my_vote %}
+  <p>Вы проголосовали: <b>{{ my_vote.get_choice_display }}</b> <span class="muted small">· {{ my_vote.cast_at|local_dt }}</span>
+    {% if my_vote.entered_by %}{% badge "внесено секретарём" "blue" %}{% endif %}</p>
+  {% if my_vote.comment %}<div class="text-block muted">{{ my_vote.comment }}</div>{% endif %}
+  {% endif %}
+  {% if can_vote %}
+  <form method="post" action="{% url 'voting:vote' session.pk %}">{% csrf_token %}
+    <div class="vote-options">
+      {% for radio in vote_form.choice %}
+      <label>{{ radio.tag }}<span>{{ radio.choice_label }}</span></label>
+      {% endfor %}
+    </div>
+    {% if session.allow_comments %}
+    <div class="field"><label for="{{ vote_form.comment.id_for_label }}">Комментарий</label>{{ vote_form.comment }}</div>
+    {% endif %}
+    <button class="btn btn-primary" type="submit">{% if my_vote %}Изменить голос{% else %}Проголосовать{% endif %}</button>
+    {% if not commission.allow_vote_change %}<p class="small muted">Внимание: после отправки голос изменить нельзя.</p>{% endif %}
+  </form>
+  {% elif session.status == 'open' and my_vote %}
+  <p class="small muted">Изменение голоса в этой комиссии не допускается.</p>
+  {% elif session.status == 'draft' %}
+  <p class="muted">Голосование ещё не открыто.</p>
+  {% elif not session.is_open and session.status == 'open' %}
+  <p class="muted">Срок голосования истёк, итоги подводятся.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if enter_form %}
+<div class="card">
+  <div class="card-head"><h2>Внести голос со слов члена комиссии</h2></div>
+  <form method="post" action="{% url 'voting:enter_vote' session.pk %}">{% csrf_token %}
+    {% include "partials/form.html" with form=enter_form %}
+    <button class="btn" type="submit" data-confirm="Внести голос от имени выбранного члена комиссии?">Внести голос</button>
+  </form>
+</div>
+{% endif %}
+
+{% if session.status != 'draft' %}
+<div class="card">
+  <div class="card-head"><h2>Результаты</h2></div>
+  {% if visibility.totals %}
+    {% if session.status == 'closed' %}
+    <p><b>{{ session.get_outcome_display }}</b></p>
+    <div class="grid-3">
+      <div class="stat"><div class="value">{{ session.votes_for }}</div><div class="label">за</div></div>
+      <div class="stat"><div class="value">{{ session.votes_against }}</div><div class="label">против</div></div>
+      <div class="stat"><div class="value">{{ session.votes_abstain }}</div><div class="label">воздержались</div></div>
+    </div>
+    {% else %}
+    <p class="muted small">Промежуточные данные (видны только секретарю и председателю).</p>
+    {% endif %}
+  {% else %}
+    <p class="muted">Итоги будут доступны после завершения голосования.</p>
+  {% endif %}
+
+  {% if visibility.per_person %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Член комиссии</th><th>Голос</th><th>Время</th><th>Комментарий</th></tr></thead>
+    <tbody>
+    {% for v in votes %}
+    <tr><td>{{ v.user.full_name }}{% if v.entered_by %} {% badge "внесено секретарём" "blue" %}{% endif %}</td>
+      <td>{{ v.get_choice_display }}</td><td class="nowrap">{{ v.cast_at|local_dt }}</td><td class="text-block">{{ v.comment }}</td></tr>
+    {% empty %}<tr><td colspan="4" class="empty">Голосов пока нет</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% else %}
+  <h3>Проголосовали</h3>
+  {% if voters %}<p>{% for u in voters %}{{ u.short_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% else %}<p class="empty">Пока никто не проголосовал.</p>{% endif %}
+  {% endif %}
+
+  {% if not_voted %}
+  <h3>Ещё не проголосовали</h3>
+  <p>{% for u in not_voted %}{{ u.short_name }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

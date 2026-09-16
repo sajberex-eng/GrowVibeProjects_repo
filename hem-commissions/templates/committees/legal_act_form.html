@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}НПА — {{ commission.short_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'committees:list' %}">Комиссии</a> / <a href="{% url 'committees:detail' commission.pk %}?tab=legal">{{ commission.short_name }}</a> / НПА</div>
+<div class="page-head"><h1>{% if mode == "replace" %}Замена НПА{% elif mode == "edit" %}Изменение НПА{% else %}Новый НПА{% endif %}</h1></div>
+<div class="card form-narrow">
+  {% if mode == "replace" %}
+  <div class="callout small">Заменяемый акт: <b>{{ act }}</b>. Он будет отмечен как утративший силу со ссылкой на новый акт.</div>
+  {% endif %}
+  <form method="post">{% csrf_token %}
+    {% include "partials/form.html" with form=form %}
+    <p class="small muted">Ссылка — страница документа на adilet.zan.kz (например, https://adilet.zan.kz/rus/docs/V2000021727). Актуальность проверяется ежемесячно и по кнопке «Проверить».</p>
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Сохранить</button>
+      <a class="btn btn-ghost" href="{% url 'committees:detail' commission.pk %}?tab=legal">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

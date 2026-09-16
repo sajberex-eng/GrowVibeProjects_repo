@@ -1,0 +1,6 @@
+{% load ui %}{% if page.paginator.num_pages > 1 %}
+<div class="actions" style="margin-top:12px">
+  {% if page.has_previous %}<a class="btn btn-sm" href="{% query_replace page=page.previous_page_number %}">← Назад</a>{% endif %}
+  <span class="muted small">Стр. {{ page.number }} из {{ page.paginator.num_pages }} · всего {{ page.paginator.count }}</span>
+  {% if page.has_next %}<a class="btn btn-sm" href="{% query_replace page=page.next_page_number %}">Далее →</a>{% endif %}
+</div>{% endif %}

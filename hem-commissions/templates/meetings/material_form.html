@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Материал заседания{% endblock %}
+{% block content %}
+{% include "meetings/_crumbs.html" %}
+<div class="page-head"><div><h1>{% if kind == 'file' %}Загрузить материал{% elif kind == 'audio' %}Ссылка на аудиозапись{% elif kind == 'video' %}Ссылка на видеозапись{% else %}Добавить ссылку{% endif %}</h1><div class="sub">{{ meeting }}</div></div></div>
+<div class="tabs">
+  <a href="?type=file" class="{% if kind == 'file' %}active{% endif %}">Файл</a>
+  <a href="?type=link" class="{% if kind == 'link' %}active{% endif %}">Ссылка</a>
+  <a href="?type=audio" class="{% if kind == 'audio' %}active{% endif %}">Аудиозапись</a>
+  <a href="?type=video" class="{% if kind == 'video' %}active{% endif %}">Видеозапись</a>
+</div>
+<div class="card form-narrow">
+  {% if kind == 'audio' %}<p class="callout info">Аудиофайл в систему не загружается: укажите ссылку на запись в хранилище организации.</p>{% endif %}
+  {% if kind == 'file' %}<p class="small muted">Допустимы документы, таблицы, презентации, изображения и архивы. Не загружайте документы с ФИО/ИИН пациентов.</p>{% endif %}
+  <form method="post" enctype="multipart/form-data" novalidate>
+    {% csrf_token %}
+    {% include "partials/form.html" with form=form %}
+    <div class="field checkbox"><label><input type="checkbox" name="silent" value="1"> Не уведомлять участников</label></div>
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">Добавить</button>
+      <a class="btn btn-ghost" href="{% url 'meetings:detail' meeting.pk %}?tab={% if kind == 'audio' or kind == 'video' %}records{% else %}materials{% endif %}">Отмена</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

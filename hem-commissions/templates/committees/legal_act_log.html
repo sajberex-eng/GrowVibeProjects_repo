@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Журнал проверок НПА{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'committees:list' %}">Комиссии</a> / <a href="{% url 'committees:detail' commission.pk %}?tab=legal">{{ commission.short_name }}</a> / Журнал проверок</div>
+<div class="page-head">
+  <div><h1>{{ act.title }}</h1>
+    <div class="sub"><span class="dot dot-{{ act.dot }}"></span>{{ act.get_status_display }}{% if act.number %} · {{ act.number }}{% endif %}{% if act.url %} · <a href="{{ act.url }}" target="_blank" rel="noopener noreferrer">adilet.zan.kz</a>{% endif %}</div></div>
+  {% if manage %}<div class="actions">
+    <form class="inline" method="post" action="{% url 'committees:legal_act_check' commission.pk act.pk %}">{% csrf_token %}
+      <input type="hidden" name="next" value="{{ request.path }}">
+      <button class="btn btn-primary" type="submit">Проверить сейчас</button></form>
+  </div>{% endif %}
+</div>
+<div class="card"><div class="table-wrap"><table class="table">
+  <thead><tr><th>Дата</th><th>Результат</th><th>Подробности</th><th>Вид</th></tr></thead>
+  <tbody>
+  {% for c in checks %}
+  <tr><td class="nowrap">{{ c.checked_at|local_dt }}</td><td>{% status_badge c field="result" %}</td><td class="small">{{ c.details }}</td>
+    <td class="small">{% if c.manual %}внеплановая{% if c.initiated_by %} ({{ c.initiated_by.short_name }}){% endif %}{% else %}плановая{% endif %}</td></tr>
+  {% empty %}<tr><td colspan="4" class="empty">Проверок ещё не было.</td></tr>{% endfor %}
+  </tbody>
+</table></div></div>
+{% endblock %}

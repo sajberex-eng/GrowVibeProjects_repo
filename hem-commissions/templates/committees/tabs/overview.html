@@ -1,0 +1,80 @@
+{% load ui %}
+<div class="grid-2">
+  <div class="card">
+    <div class="card-head"><h2>О комиссии</h2></div>
+    <dl class="kv">
+      <dt>Полное наименование</dt><dd>{{ commission.name }}</dd>
+      <dt>Краткое</dt><dd>{{ commission.short_name }}</dd>
+      <dt>Тип</dt><dd>{{ commission.get_kind_display }}</dd>
+      <dt>Дата создания</dt><dd>{{ commission.established_on|date:"d.m.Y"|default:"—" }}</dd>
+      <dt>Площадки</dt><dd>{% for c in commission.cities.all %}{{ c }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</dd>
+      {% if commission.description %}<dt>Назначение</dt><dd class="text-block">{{ commission.description }}</dd>{% endif %}
+      {% if commission.handles_patient_cases %}<dt>Клинические случаи</dt><dd>рассматриваются; указывается только внутренний ID пациента из МИС</dd>{% endif %}
+      <dt>Кворум заседания</dt><dd>{{ commission.meeting_quorum_label }}</dd>
+      <dt>Кворум голосования</dt><dd>{{ commission.vote_quorum_label }}</dd>
+      <dt>Положение</dt><dd>{% if regulation %}<a href="{% url 'committees:regulation_download' commission.pk regulation.pk %}">{{ regulation.title }}, ред. {{ regulation.version }}</a> от {{ regulation.approved_on|date:"d.m.Y" }}{% if regulation.order_number %} (приказ № {{ regulation.order_number }}){% endif %}{% else %}<span class="muted">не загружено</span>{% endif %}</dd>
+      <dt>Приказ о составе</dt><dd>{% if comp_order %}{% if comp_order.scan_file %}<a href="{% url 'committees:order_scan' commission.pk comp_order.pk %}">{{ comp_order }}</a>{% else %}{{ comp_order }}{% endif %}{% else %}<span class="muted">—</span>{% endif %}</dd>
+    </dl>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Нормативная база</h2><a class="small" href="?tab=legal">Подробнее →</a></div>
+    <p class="small"><span class="dot dot-{{ legal.color }}"></span>{{ legal.label }}{% if legal.checked %} · проверено {{ legal.checked|local_dt }}{% endif %}</p>
+    <ul class="list-plain">
+      {% for a in acts %}
+      <li><span class="dot dot-{{ a.dot }}" title="{{ a.get_status_display }}"></span>
+        {% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
+        {% if a.number %}<span class="muted">{{ a.number }}</span>{% endif %}
+        <div class="small muted">{{ a.get_status_display }} · проверка: {{ a.last_checked_at|local_dt:"%d.%m.%Y" }}</div></li>
+      {% empty %}<li class="empty">НПА не указаны.</li>{% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <div class="card-head"><h2>Действующий состав</h2>
+    <span class="small">{% if manage and pending_changes %}<span class="badge badge-amber">изменений в проекте: {{ pending_changes }}</span>{% endif %}<a href="?tab=composition">История и изменения →</a></span></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>ФИО</th><th>Роль</th><th>Должность</th><th>Город</th></tr></thead>
+    <tbody>
+    {% for r in members %}
+    <tr><td>{{ r.user.full_name }}</td><td>{{ r.get_role_display }}</td><td>{{ r.position_text|default:"—" }}</td><td>{{ r.city_text|default:"—" }}</td></tr>
+    {% empty %}<tr><td colspan="4" class="empty">Состав не утверждён.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+
+<div class="grid-3">
+  <div class="card">
+    <div class="card-head"><h2>Ближайшие заседания</h2>
+      {% url 'meetings:calendar' as calendar_url %}{% if calendar_url %}<a class="small" href="{{ calendar_url }}?commission={{ commission.pk }}">Календарь →</a>{% endif %}</div>
+    <ul class="list-plain">
+      {% for m in upcoming %}
+      {% url 'meetings:detail' m.pk as m_url %}
+      <li>{% if m_url %}<a href="{{ m_url }}">{{ m.starts_at|local_dt }}</a>{% else %}{{ m.starts_at|local_dt }}{% endif %}
+        {% status_badge m %}{% if m.kind == 'extra' %} {% badge "внеочередное" "amber" %}{% endif %}
+        <div class="small muted">{{ m.get_format_display }}{% if m.place %} · {{ m.place }}{% endif %}</div></li>
+      {% empty %}<li class="empty">Не запланировано.</li>{% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Открытые поручения</h2></div>
+    <ul class="list-plain">
+      {% for a in assignments %}
+      {% url 'protocols:assignment_detail' a.pk as a_url %}
+      <li>{% if a_url %}<a href="{{ a_url }}">{{ a.text|truncatechars:90 }}</a>{% else %}{{ a.text|truncatechars:90 }}{% endif %}
+        <div class="small muted">срок {{ a.due_date|date:"d.m.Y" }}
+          {% if a.is_overdue %}{% status_badge a override="overdue" %}{% else %}{% status_badge a %}{% endif %}</div></li>
+      {% empty %}<li class="empty">Нет открытых поручений.</li>{% endfor %}
+    </ul>
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Последние протоколы</h2></div>
+    <ul class="list-plain">
+      {% for p in protocols %}
+      {% url 'protocols:detail' p.pk as p_url %}
+      <li>{% if p_url %}<a href="{{ p_url }}">№ {{ p.number|default:"б/н" }} от {{ p.protocol_date|date:"d.m.Y" }}</a>{% else %}№ {{ p.number|default:"б/н" }} от {{ p.protocol_date|date:"d.m.Y" }}{% endif %}
+        {% status_badge p %}</li>
+      {% empty %}<li class="empty">Протоколов пока нет.</li>{% endfor %}
+    </ul>
+  </div>
+</div>

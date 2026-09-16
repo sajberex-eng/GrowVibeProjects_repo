@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Транскрипт{% endblock %}
+{% block content %}
+{% include "meetings/_crumbs.html" with back_tab="records" %}
+<div class="page-head">
+  <div><h1>Транскрипт записи</h1>
+    <div class="sub">{{ meeting }}{% if transcript.audio %} · {{ transcript.audio.title }}{% endif %}</div>
+    <div style="margin-top:6px">{% status_badge transcript %} <span class="small muted">обновлён {{ transcript.updated_at|local_dt }}</span></div></div>
+  <div class="actions">
+    <button class="btn btn-sm" type="button" onclick="window.print()">Печать</button>
+    {% if can_manage %}<a class="btn btn-sm" href="{% url 'meetings:transcript_edit' transcript.pk %}">Править</a>{% endif %}
+  </div>
+</div>
+<div class="card">
+  {% if transcript.error %}<p class="callout danger">{{ transcript.error }}</p>{% endif %}
+  {% if transcript.text %}<div class="text-block">{{ transcript.text }}</div>{% else %}<p class="empty">Текст отсутствует.</p>{% endif %}
+</div>
+{% endblock %}

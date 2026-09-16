@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Поручения{% endblock %}
+{% block content %}
+<div class="page-head"><div><h1>Реестр поручений</h1><div class="sub">Поручения по подписанным протоколам</div></div>
+  <div class="actions">
+    <a class="btn btn-sm {% if f.mine == '1' %}btn-primary{% endif %}" href="{% query_replace mine='1' page='' %}">Мои</a>
+    <a class="btn btn-sm {% if f.status == 'overdue' %}btn-primary{% endif %}" href="{% query_replace status='overdue' page='' %}">Просроченные</a>
+    <a class="btn btn-sm {% if f.status == 'on_confirmation' %}btn-primary{% endif %}" href="{% query_replace status='on_confirmation' page='' %}">На подтверждении</a>
+  </div>
+</div>
+<form class="filters" method="get">
+  {% if f.mine == '1' %}<input type="hidden" name="mine" value="1">{% endif %}
+  <div class="field"><label>Поиск</label><input type="search" name="q" value="{{ f.q|default:'' }}" placeholder="Текст, № протокола"></div>
+  <div class="field"><label>Комиссия</label><select name="commission"><option value="">Все</option>
+    {% for c in commissions %}<option value="{{ c.pk }}" {% if f.commission == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.short_name }}</option>{% endfor %}</select></div>
+  <div class="field"><label>Ответственный</label><select name="responsible"><option value="">Все</option>
+    {% for u in people %}<option value="{{ u.pk }}" {% if f.responsible == u.pk|stringformat:'s' %}selected{% endif %}>{{ u.short_name }}</option>{% endfor %}</select></div>
+  <div class="field"><label>Статус</label><select name="status"><option value="">Все</option>
+    {% for value, label in status_choices %}<option value="{{ value }}" {% if f.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="field"><label>Срок с</label><input type="date" name="due_from" value="{{ f.due_from|default:'' }}"></div>
+  <div class="field"><label>Срок по</label><input type="date" name="due_to" value="{{ f.due_to|default:'' }}"></div>
+  <button class="btn" type="submit">Показать</button>
+  {% if request.GET %}<a class="btn btn-ghost" href="{% url 'protocols:assignments' %}">Сбросить</a>{% endif %}
+</form>
+<div class="card"><div class="table-wrap"><table class="table">
+  <thead><tr><th>Поручение</th><th>Комиссия / протокол</th><th>Ответственный</th><th>Срок</th><th>Статус</th></tr></thead>
+  <tbody>
+  {% for a in page %}
+  <tr class="{% if a.is_overdue %}row-danger{% elif not a.is_open %}row-muted{% endif %}">
+    <td><a href="{% url 'protocols:assignment_detail' a.pk %}">{{ a.text|truncatechars:140 }}</a></td>
+    <td class="nowrap">{{ a.commission.short_name }} · № {{ a.decision.protocol.number }}</td>
+    <td>{{ a.responsible_display }}</td>
+    <td class="nowrap">{{ a.due_date|date:"d.m.Y" }}</td>
+    <td>{% if a.is_overdue %}{% status_badge a override="overdue" %} {% if a.status == 'on_confirmation' %}{% status_badge a %}{% endif %}{% else %}{% status_badge a %}{% endif %}</td>
+  </tr>
+  {% empty %}<tr><td colspan="5" class="empty">Поручений не найдено</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

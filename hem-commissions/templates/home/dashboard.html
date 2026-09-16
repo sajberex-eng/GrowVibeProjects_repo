@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Главная{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Здравствуйте, {{ user.first_name|default:user.username }}!</h1>
+  <div class="sub">{{ today|date:"l, j E Y" }}</div></div>
+</div>
+
+{% if to_sign or open_votes or pending_approvals %}
+<div class="card">
+  <div class="card-head"><h2>Требует вашего действия</h2></div>
+  <ul class="list-plain">
+    {% for p in to_sign %}
+    <li>{% badge "подпись" "blue" %} <a href="{% url 'protocols:detail' p.pk %}">{{ p }}</a> — ожидает вашей подписи</li>
+    {% endfor %}
+    {% for v in open_votes %}
+    <li>{% badge "голосование" "amber" %} <a href="{% url 'voting:detail' v.pk %}">{{ v.question }}</a>
+      <span class="muted small">· {{ v.commission.short_name }} · до {{ v.deadline|local_dt }}</span></li>
+    {% endfor %}
+    {% for a in pending_approvals %}
+    <li>{% badge "согласование" "amber" %} <a href="{% url 'protocols:detail' a.protocol.pk %}">{{ a.protocol }}</a>
+      <span class="muted small">· срок до {{ a.protocol.approval_deadline|date:"d.m.Y" }}</span></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+{% if managed %}
+<div class="grid-4" style="margin-bottom:16px">
+  <a class="stat {% if overdue_count %}warn{% endif %}" href="{% url 'protocols:assignments' %}?status=overdue"><div class="value">{{ overdue_count }}</div><div class="label">просроченных поручений</div></a>
+  <a class="stat" href="{% url 'protocols:assignments' %}?status=on_confirmation"><div class="value">{{ on_confirmation }}</div><div class="label">поручений ждут подтверждения</div></a>
+  <a class="stat" href="{% url 'protocols:list' %}?status=draft"><div class="value">{{ drafts }}</div><div class="label">черновиков протоколов</div></a>
+  {% if user.is_admin %}<a class="stat {% if legal_alerts %}warn{% endif %}" href="{% url 'committees:legal_monitor' %}"><div class="value">{{ legal_alerts }}</div><div class="label">НПА требуют внимания</div></a>{% endif %}
+</div>
+{% endif %}
+
+<div class="grid-2">
+  <div class="card">
+    <div class="card-head"><h2>Ближайшие заседания</h2><a class="small" href="{% url 'meetings:calendar' %}">Календарь →</a></div>
+    {% if upcoming %}
+    <ul class="list-plain">
+      {% for m in upcoming %}
+      <li><a href="{% url 'meetings:detail' m.pk %}"><b>{{ m.commission.short_name }}</b> · {{ m.starts_at|local_dt }}</a>
+        {% status_badge m %} {% if m.kind == 'extra' %}{% badge "внеочередное" "amber" %}{% endif %}
+        <div class="small muted">{{ m.get_format_display }}{% if m.place %} · {{ m.place }}{% endif %}</div></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="empty">Заседаний не запланировано.</p>{% endif %}
+  </div>
+  <div class="card">
+    <div class="card-head"><h2>Мои поручения</h2><a class="small" href="{% url 'protocols:assignments' %}?mine=1">Все →</a></div>
+    {% if my_assignments %}
+    <ul class="list-plain">
+      {% for a in my_assignments %}
+      <li><a href="{% url 'protocols:assignment_detail' a.pk %}">{{ a.text|truncatechars:110 }}</a>
+        <div class="small muted">{{ a.commission.short_name }} · срок {{ a.due_date|date:"d.m.Y" }}
+        {% if a.is_overdue %}{% status_badge a override="overdue" %}{% else %}{% status_badge a %}{% endif %}</div></li>
+      {% endfor %}
+    </ul>
+    {% else %}<p class="empty">Открытых поручений нет.</p>{% endif %}
+  </div>
+</div>
+
+<h2 style="margin-top:22px">Комиссии</h2>
+<div class="grid-3">
+  {% for c in commissions %}
+  <a class="card commission-tile" href="{% url 'committees:detail' c.pk %}">
+    <span class="abbr">{{ c.short_name }}</span>
+    <div>{{ c.name }}</div>
+    <div class="small muted">{% for city in c.cities.all %}{{ city }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+  </a>
+  {% empty %}
+  <p class="empty">Вы пока не входите ни в одну комиссию. Обратитесь к секретарю или администратору.</p>
+  {% endfor %}
+</div>
+{% endblock %}

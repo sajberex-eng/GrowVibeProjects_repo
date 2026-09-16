@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Протоколы{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Протоколы</h1><div class="sub">Протоколы заседаний и заочных голосований</div></div>
+  {% if managed %}
+  <div class="actions">
+    {% for c in managed %}<a class="btn btn-sm" href="{% url 'protocols:create_absentee' c.pk %}">+ Заочное голосование {{ c.short_name }}</a>{% endfor %}
+  </div>
+  {% endif %}
+</div>
+<form class="filters" method="get">
+  <div class="field"><label>Поиск</label><input type="search" name="q" value="{{ f.q|default:'' }}" placeholder="Номер, вопрос, решение, ID пациента"></div>
+  <div class="field"><label>Комиссия</label><select name="commission"><option value="">Все</option>
+    {% for c in commissions %}<option value="{{ c.pk }}" {% if f.commission == c.pk|stringformat:'s' %}selected{% endif %}>{{ c.short_name }}</option>{% endfor %}</select></div>
+  <div class="field"><label>Статус</label><select name="status"><option value="">Все</option>
+    {% for value, label in statuses %}<option value="{{ value }}" {% if f.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <div class="field"><label>Год</label><select name="year"><option value="">Все</option>
+    {% for y in years %}<option value="{{ y }}" {% if f.year == y|stringformat:'s' %}selected{% endif %}>{{ y }}</option>{% endfor %}</select></div>
+  <div class="field"><label>Вид</label><select name="kind"><option value="">Все</option>
+    {% for value, label in kinds %}<option value="{{ value }}" {% if f.kind == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+  <button class="btn" type="submit">Показать</button>
+  {% if request.GET %}<a class="btn btn-ghost" href="{% url 'protocols:list' %}">Сбросить</a>{% endif %}
+</form>
+<div class="card"><div class="table-wrap"><table class="table">
+  <thead><tr><th>№</th><th>Дата</th><th>Комиссия</th><th>Вид</th><th>Статус</th><th>Срок согласования</th></tr></thead>
+  <tbody>
+  {% for p in page %}
+  <tr class="{% if p.status == 'annulled' %}row-muted{% endif %}">
+    <td><a href="{% url 'protocols:detail' p.pk %}">{{ p.number|default:"б/н" }}</a>{% if p.revision > 1 %} <span class="muted small">ред. {{ p.revision }}</span>{% endif %}</td>
+    <td class="nowrap">{{ p.protocol_date|date:"d.m.Y" }}</td>
+    <td>{{ p.commission.short_name }}</td>
+    <td>{{ p.get_kind_display }}</td>
+    <td>{% status_badge p %}</td>
+    <td class="nowrap">{% if p.status == 'approval' %}{{ p.approval_deadline|date:"d.m.Y" }}{% else %}—{% endif %}</td>
+  </tr>
+  {% empty %}<tr><td colspan="6" class="empty">Протоколов не найдено</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}{% if commission %}Редактирование {{ commission.short_name }}{% else %}Новая комиссия{% endif %}{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'committees:list' %}">Комиссии</a>{% if commission %} / <a href="{% url 'committees:detail' commission.pk %}">{{ commission.short_name }}</a>{% endif %}</div>
+<div class="page-head"><h1>{% if commission %}Редактирование комиссии{% else %}Новая комиссия{% endif %}</h1></div>
+<style>#id_cities { display: flex; flex-wrap: wrap; gap: 4px 16px; } #id_cities label { font-weight: 400; display: flex; gap: 6px; align-items: center; }</style>
+<form method="post" class="card form-narrow">{% csrf_token %}
+  <p class="muted small">Поля «Кворум», «Сроки» и «Голосование» можно позже изменить на вкладке «Настройки» карточки комиссии. Доли задаются дробью: 1/2 — половина, 2/3 — две трети.</p>
+  {% include "partials/form.html" with form=form %}
+  <div class="actions">
+    <button class="btn btn-primary" type="submit">Сохранить</button>
+    <a class="btn btn-ghost" href="{% if commission %}{% url 'committees:detail' commission.pk %}{% else %}{% url 'committees:list' %}{% endif %}">Отмена</a>
+  </div>
+</form>
+{% endblock %}

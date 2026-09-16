@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load ui voting_tags %}
+{% block title %}Голосования{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Голосования</h1>
+    <div class="sub">Электронное голосование по вопросам повестки и заочное голосование</div></div>
+  {% if managed %}
+  <div class="actions">
+    <a class="btn btn-primary" href="{% url 'voting:create' %}">+ Заочное голосование</a>
+    <a class="btn" href="{% url 'voting:absentee_protocol' %}">Сформировать протокол заочного голосования</a>
+  </div>
+  {% endif %}
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Мои открытые голосования</h2></div>
+  {% if my_rows %}
+  <ul class="list-plain">
+    {% for row in my_rows %}{% with s=row.session %}
+    <li>
+      {% if row.voted %}{% badge "вы проголосовали" "green" %}{% else %}{% badge "ожидает вашего голоса" "amber" %}{% endif %}
+      <a href="{% url 'voting:detail' s.pk %}"><b>{{ s.question }}</b></a>
+      <div class="small muted">{{ s.commission.short_name }} · {% if s.meeting_id %}вопрос повестки{% else %}заочное{% endif %} · до {{ s.deadline|local_dt }} ({{ s.deadline|time_left }})</div>
+    </li>
+    {% endwith %}{% endfor %}
+  </ul>
+  {% else %}<p class="empty">Нет голосований, ожидающих вашего участия.</p>{% endif %}
+</div>
+
+<form class="filters" method="get">
+  <div class="field"><label for="f-commission">Комиссия</label>
+    <select id="f-commission" name="commission"><option value="">Все</option>
+      {% for c in commissions %}<option value="{{ c.pk }}" {% if f_commission == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.short_name }}</option>{% endfor %}
+    </select></div>
+  <div class="field"><label for="f-status">Статус</label>
+    <select id="f-status" name="status"><option value="">Все</option>
+      {% for value, label in statuses %}<option value="{{ value }}" {% if f_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select></div>
+  <div class="field"><label for="f-kind">Вид</label>
+    <select id="f-kind" name="kind"><option value="">Все</option>
+      <option value="meeting" {% if f_kind == 'meeting' %}selected{% endif %}>По вопросам заседаний</option>
+      <option value="absentee" {% if f_kind == 'absentee' %}selected{% endif %}>Заочные</option>
+    </select></div>
+  <button class="btn" type="submit">Показать</button>
+</form>
+
+<div class="card">
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Вопрос</th><th>Комиссия</th><th>Вид</th><th>Срок</th><th>Статус</th><th>Итог</th></tr></thead>
+    <tbody>
+    {% for s in page %}
+    <tr class="{% if s.status == 'cancelled' %}row-muted{% endif %}">
+      <td><a href="{% url 'voting:detail' s.pk %}">{{ s.question|truncatechars:120 }}</a></td>
+      <td>{{ s.commission.short_name }}</td>
+      <td>{% if s.meeting_id %}заседание {{ s.meeting.starts_at|local_dt:"%d.%m.%Y" }}{% else %}заочное{% endif %}</td>
+      <td class="nowrap">{{ s.deadline|local_dt }}</td>
+      <td>{% status_badge s %}</td>
+      <td>{% if s.outcome %}{% status_badge s "outcome" %}{% else %}—{% endif %}</td>
+    </tr>
+    {% empty %}<tr><td colspan="6" class="empty">Голосований нет</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

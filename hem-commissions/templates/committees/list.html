@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Комиссии{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Комиссии</h1><div class="sub">Коллегиальные органы Центра гематологии</div></div>
+  <div class="actions">
+    <a class="btn btn-sm {% if view != 'table' %}btn-primary{% endif %}" href="{% query_replace view='cards' %}">Карточки</a>
+    <a class="btn btn-sm {% if view == 'table' %}btn-primary{% endif %}" href="{% query_replace view='table' %}">Таблица</a>
+    {% if user.is_admin %}
+      {% if show_inactive %}<a class="btn btn-sm" href="{% query_replace all='' %}">Только действующие</a>
+      {% else %}<a class="btn btn-sm" href="{% query_replace all='1' %}">Показать все</a>{% endif %}
+      <a class="btn btn-primary" href="{% url 'committees:create' %}">+ Комиссия</a>
+    {% endif %}
+  </div>
+</div>
+
+{% for group in groups %}
+<h2 style="margin-top:18px">{{ group.title }}</h2>
+{% if view == 'table' %}
+<div class="card"><div class="table-wrap"><table class="table">
+  <thead><tr><th>Кратко</th><th>Наименование</th><th>Площадки</th><th class="num">Состав</th><th>НПА</th><th>Моя роль</th></tr></thead>
+  <tbody>
+  {% for c in group.items %}
+  <tr class="{% if not c.is_active %}row-muted{% endif %}">
+    <td><a href="{% url 'committees:detail' c.pk %}"><b>{{ c.short_name }}</b></a></td>
+    <td>{{ c.name }}{% if not c.is_active %} {% badge "не действует" "gray" %}{% endif %}</td>
+    <td>{% for city in c.cities.all %}{{ city }}{% if not forloop.last %}, {% endif %}{% empty %}—{% endfor %}</td>
+    <td class="num">{{ c.members_count }}</td>
+    <td class="nowrap" title="{{ c.legal.label }}"><span class="dot dot-{{ c.legal.color }}"></span><span class="small muted">{{ c.legal.checked|local_dt:"%d.%m.%Y" }}</span></td>
+    <td class="small">{{ c.my_roles|join:", "|default:"—" }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table></div></div>
+{% else %}
+<div class="grid-3">
+  {% for c in group.items %}
+  <a class="card commission-tile" href="{% url 'committees:detail' c.pk %}">
+    <span class="abbr">{{ c.short_name }}</span>
+    {% if not c.is_active %}{% badge "не действует" "gray" %}{% endif %}
+    <div>{{ c.name }}</div>
+    <div class="small muted">
+      {% for city in c.cities.all %}{{ city }}{% if not forloop.last %}, {% endif %}{% empty %}площадки не указаны{% endfor %}
+      · в составе: {{ c.members_count }}
+    </div>
+    <div class="small" title="{{ c.legal.label }}"><span class="dot dot-{{ c.legal.color }}"></span>{{ c.legal.label }}{% if c.legal.checked %} · {{ c.legal.checked|local_dt:"%d.%m.%Y" }}{% endif %}</div>
+    {% if c.my_roles %}<div class="small muted">Моя роль: {{ c.my_roles|join:", " }}</div>{% endif %}
+  </a>
+  {% endfor %}
+</div>
+{% endif %}
+{% empty %}
+<div class="card"><p class="empty">Вы пока не входите ни в одну комиссию. Обратитесь к секретарю или администратору.</p></div>
+{% endfor %}
+{% endblock %}

@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+{% include "meetings/_crumbs.html" %}
+<div class="page-head"><div><h1>{{ title }}</h1>
+  {% if commission %}<div class="sub">{{ commission.name }}</div>{% endif %}</div></div>
+<div class="card form-narrow">
+  {% if meeting %}<p class="callout info">Дата и время меняются через «Перенести» — участники получат уведомление, исходная дата сохранится.</p>{% endif %}
+  <form method="post" novalidate>
+    {% csrf_token %}
+    {% include "partials/form.html" with form=form %}
+    <div class="actions">
+      <button class="btn btn-primary" type="submit">{% if meeting %}Сохранить{% else %}Назначить заседание{% endif %}</button>
+      <a class="btn btn-ghost" href="{% if meeting %}{% url 'meetings:detail' meeting.pk %}{% else %}{% url 'meetings:calendar' %}{% endif %}">Отмена</a>
+    </div>
+    {% if not meeting %}<p class="small muted" style="margin-top:10px">Состав комиссии на дату заседания получит уведомление. Если есть открытые поручения, в повестку автоматически добавится пункт «Контроль исполнения решений».</p>{% endif %}
+  </form>
+</div>
+{% endblock %}

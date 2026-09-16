@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Мониторинг НПА{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Мониторинг нормативной базы</h1><div class="sub">Проверка актуальности НПА на adilet.zan.kz — ежемесячно и по запросу</div></div>
+  <div class="actions">
+    <form class="inline" method="post" action="{% url 'committees:legal_check_all' %}">{% csrf_token %}
+      <button class="btn btn-primary" type="submit" data-confirm="Проверка всех НПА может занять несколько минут. Продолжить?">Проверить все сейчас</button></form>
+  </div>
+</div>
+{% if not playwright %}<div class="callout small">Playwright не установлен — автоматическая проверка невозможна, все проверки завершатся статусом «Требует проверки». Установите: <code>pip install playwright &amp;&amp; playwright install chromium</code>.</div>{% endif %}
+
+<div class="grid-4" style="margin-bottom:16px">
+  {% for s in summary %}
+  <a class="stat {% if s.dot == 'red' and s.count %}warn{% endif %}" href="?status={{ s.code }}"><div class="value">{{ s.count }}</div><div class="label"><span class="dot dot-{{ s.dot }}"></span>{{ s.label }}</div></a>
+  {% endfor %}
+</div>
+
+<form class="filters" method="get">
+  <div class="field"><label for="f-status">Статус</label><select id="f-status" name="status">
+    <option value="">Все</option>
+    <option value="attention" {% if status == 'attention' %}selected{% endif %}>Требуют внимания</option>
+    {% for code, label in statuses %}<option value="{{ code }}" {% if status == code %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></div>
+  <div class="field"><label for="f-comm">Комиссия</label><select id="f-comm" name="commission">
+    <option value="">Все</option>
+    {% for c in commissions %}<option value="{{ c.pk }}" {% if commission_id == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.short_name }}</option>{% endfor %}
+  </select></div>
+  <button class="btn" type="submit">Показать</button>
+</form>
+
+<div class="card"><div class="table-wrap"><table class="table">
+  <thead><tr><th>Статус</th><th>Комиссия</th><th>Акт</th><th>Последняя проверка</th><th></th></tr></thead>
+  <tbody>
+  {% for a in acts %}
+  <tr class="{% if a.status == 'retired' %}row-muted{% elif a.status == 'lost_force' or a.status == 'unavailable' %}row-danger{% endif %}">
+    <td class="nowrap"><span class="dot dot-{{ a.dot }}"></span>{% status_badge a %}</td>
+    <td><a href="{% url 'committees:detail' a.commission_id %}?tab=legal">{{ a.commission.short_name }}</a></td>
+    <td>{% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a>{% else %}{{ a.title }} <span class="small muted">(нет ссылки)</span>{% endif %}
+      <div class="small muted">{{ a.number }}{% if a.replaced_by %} · заменён на: {{ a.replaced_by }}{% endif %}</div></td>
+    <td class="small nowrap"><a href="{% url 'committees:legal_act_log' a.commission_id a.pk %}">{{ a.last_checked_at|local_dt }}</a></td>
+    <td class="nowrap">
+      <form class="inline" method="post" action="{% url 'committees:legal_act_check' a.commission_id a.pk %}">{% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <button class="btn btn-sm" type="submit">Проверить</button></form>
+    </td>
+  </tr>
+  {% empty %}<tr><td colspan="5" class="empty">Нет НПА по фильтру.</td></tr>{% endfor %}
+  </tbody>
+</table></div></div>
+
+<div class="card">
+  <div class="card-head"><h2>Последние проверки</h2></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Дата</th><th>Комиссия</th><th>Акт</th><th>Результат</th><th>Подробности</th><th>Вид</th></tr></thead>
+    <tbody>
+    {% for c in checks %}
+    <tr><td class="nowrap">{{ c.checked_at|local_dt }}</td><td>{{ c.act.commission.short_name }}</td><td class="small">{{ c.act.title|truncatechars:60 }}</td>
+      <td>{% status_badge c field="result" %}</td><td class="small">{{ c.details }}</td>
+      <td class="small">{% if c.manual %}внеплановая{% else %}плановая{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="6" class="empty">Проверок ещё не было.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+{% endblock %}

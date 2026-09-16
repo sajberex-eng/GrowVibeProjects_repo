@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Заседания{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><h1>Заседания</h1><div class="sub">Все заседания доступных вам комиссий</div></div>
+  <div class="actions">
+    <a class="btn" href="{% url 'meetings:calendar' %}">Календарь</a>
+    {% if can_create %}<a class="btn btn-primary" href="{% url 'meetings:create' %}{% if commission_pk %}?commission={{ commission_pk }}{% endif %}">+ Заседание</a>{% endif %}
+  </div>
+</div>
+<form class="filters" method="get">
+  <div class="field"><label>Комиссия</label><select name="commission">
+    <option value="">Все</option>
+    {% for c in commissions %}<option value="{{ c.pk }}" {% if c.pk == commission_pk %}selected{% endif %}>{{ c.short_name }}</option>{% endfor %}
+  </select></div>
+  <div class="field"><label>Период</label><select name="period">
+    <option value="upcoming" {% if period == 'upcoming' %}selected{% endif %}>Предстоящие</option>
+    <option value="past" {% if period == 'past' %}selected{% endif %}>Прошедшие</option>
+    <option value="all" {% if period == 'all' %}selected{% endif %}>Все</option>
+  </select></div>
+  <div class="field"><label>Статус</label><select name="status">
+    <option value="">Любой</option>
+    {% for value, label in statuses %}<option value="{{ value }}" {% if value == status %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select></div>
+  <div class="field"><label>Год</label><input type="number" name="year" value="{{ year }}" min="2000" max="2100"></div>
+  <button class="btn" type="submit">Показать</button>
+</form>
+<div class="card"><div class="table-wrap"><table class="table">
+  <thead><tr><th>Дата и время</th><th>Комиссия</th><th>Тип / формат</th><th>Место</th><th>Статус</th><th>Повестка</th><th>Протокол</th></tr></thead>
+  <tbody>
+  {% for m in page %}
+  <tr class="{% if m.status == 'cancelled' %}row-muted{% endif %}">
+    <td class="nowrap"><a href="{% url 'meetings:detail' m.pk %}">{{ m.starts_at|local_dt }}</a>
+      {% if m.original_starts_at %}<div class="small muted">было {{ m.original_starts_at|local_dt }}</div>{% endif %}</td>
+    <td><b>{{ m.commission.short_name }}</b></td>
+    <td>{{ m.get_kind_display }}<div class="small muted">{{ m.get_format_display }}</div></td>
+    <td>{{ m.place|default:"—" }}</td>
+    <td>{% status_badge m %}</td>
+    <td>{% if m.agenda_status == 'approved' %}{% badge "утверждена" "green" %}{% elif m.agenda_status == 'submitted' %}{% badge "на утверждении" "amber" %}{% else %}{% badge "формируется" "gray" %}{% endif %}</td>
+    <td>{% for p in m.protocols.all %}{% status_badge p %} {% empty %}<span class="muted">—</span>{% endfor %}</td>
+  </tr>
+  {% empty %}<tr><td colspan="7" class="empty">Заседаний не найдено</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% include "partials/pagination.html" %}
+</div>
+{% endblock %}

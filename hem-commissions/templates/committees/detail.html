@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}{{ commission.short_name }}{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'committees:list' %}">Комиссии</a> / {{ commission.short_name }}</div>
+<div class="page-head">
+  <div>
+    <h1>{{ commission.name }}</h1>
+    <div class="sub">{{ commission.short_name }} · {{ commission.get_kind_display }}
+      {% if not commission.is_active %} {% badge "не действует" "gray" %}{% endif %}
+      {% if my_roles %} · {{ my_roles|join:", " }}{% endif %}</div>
+  </div>
+  <div class="actions">
+    {% url 'meetings:calendar' as calendar_url %}
+    {% if calendar_url %}<a class="btn" href="{{ calendar_url }}?commission={{ commission.pk }}">Календарь заседаний</a>{% endif %}
+    {% if is_admin %}<a class="btn" href="{% url 'committees:edit' commission.pk %}">Редактировать</a>{% endif %}
+  </div>
+</div>
+<nav class="tabs">
+  {% for key, label in tabs %}<a href="?tab={{ key }}" class="{% if key == tab %}active{% endif %}">{{ label }}</a>{% endfor %}
+</nav>
+{% if tab == "overview" %}{% include "committees/tabs/overview.html" %}
+{% elif tab == "composition" %}{% include "committees/tabs/composition.html" %}
+{% elif tab == "orders" %}{% include "committees/tabs/orders.html" %}
+{% elif tab == "regulations" %}{% include "committees/tabs/regulations.html" %}
+{% elif tab == "legal" %}{% include "committees/tabs/legal.html" %}
+{% elif tab == "settings" %}{% include "committees/tabs/settings.html" %}
+{% endif %}
+{% endblock %}

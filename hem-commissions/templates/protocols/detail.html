@@ -1,0 +1,275 @@
+{% extends "base.html" %}
+{% load ui %}
+{% block title %}Протокол № {{ protocol.number|default:"б/н" }}{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'protocols:list' %}">Протоколы</a> /
+  {% if member_view %}<a href="{% url 'committees:detail' commission.pk %}">{{ commission.short_name }}</a>{% else %}{{ commission.short_name }}{% endif %}</div>
+
+<div class="page-head">
+  <div>
+    <h1>Протокол № {{ protocol.number|default:"б/н" }} {% status_badge protocol %}</h1>
+    <div class="sub">{{ protocol.get_kind_display }} · {{ commission.name }} · {{ protocol.protocol_date|date:"d.m.Y" }}{% if protocol.revision > 1 %} · редакция {{ protocol.revision }}{% endif %}</div>
+  </div>
+  <div class="actions">
+    {% if protocol.signed_pdf %}<a class="btn btn-primary" href="{% url 'protocols:download_signed' protocol.pk %}">Подписанный PDF</a>{% endif %}
+    {% if protocol.frozen_pdf %}<a class="btn" href="{% url 'protocols:download_frozen' protocol.pk %}">PDF на подпись</a>{% endif %}
+    {% if can_manage and not protocol.frozen_pdf %}<a class="btn" href="{% url 'protocols:preview_pdf' protocol.pk %}" target="_blank" rel="noopener">Предпросмотр PDF</a>{% endif %}
+    {% if can_manage or protocol.snapshot %}<a class="btn" href="{% url 'protocols:export_docx' protocol.pk %}">DOCX</a>{% endif %}
+    {% if protocol.status != 'draft' and protocol.status != 'approval' %}<a class="btn btn-ghost" href="{% url 'verify' protocol.uid %}" target="_blank" rel="noopener">Страница проверки</a>{% endif %}
+  </div>
+</div>
+
+{% if protocol.status == 'annulled' %}
+<div class="callout danger"><b>Протокол аннулирован</b> {{ protocol.annulled_at|local_dt }}. Причина: {{ protocol.annulled_reason }}
+  {% for p in replaced_by %}<br>Взамен: <a href="{% url 'protocols:detail' p.pk %}">протокол № {{ p.number }}</a> {% status_badge p %}{% endfor %}</div>
+{% endif %}
+{% if protocol.replaces_id %}
+<div class="callout info">Протокол составлен взамен аннулированного <a href="{% url 'protocols:detail' protocol.replaces_id %}">№ {{ protocol.replaces.number }}</a>.</div>
+{% endif %}
+{% if protocol.transcription_used %}
+<div class="callout info">Протокол сформирован с использованием автоматической транскрипции; итоговый текст выверен секретарём.</div>
+{% endif %}
+{% if has_flags and can_manage and protocol.status == 'draft' %}
+<div class="callout {% if needs_deid and not protocol.patient_ids_confirmed %}danger{% endif %}">
+  <b>Возможные ФИО в тексте протокола.</b> {% if commission.handles_patient_cases %}Для клинических случаев допускается только ID пациента из МИС.{% endif %}
+  Проверьте вопросы, отмеченные значком ⚠.
+  {% if needs_deid %}
+  <form method="post" action="{% url 'protocols:confirm_patient_ids' protocol.pk %}" style="margin-top:8px">{% csrf_token %}
+    <label><input type="checkbox" name="confirmed" {% if protocol.patient_ids_confirmed %}checked{% endif %}> {{ confirm_form.confirmed.label }}</label>
+    <button class="btn btn-sm" type="submit">Сохранить</button></form>
+  {% endif %}
+</div>
+{% endif %}
+
+<div class="card">
+  <div class="card-head"><h2>Этапы</h2></div>
+  <div class="actions">
+    {% for label, done, current in steps %}
+      {% if current %}{% badge label "blue" %}{% elif done %}{% badge label "green" %}{% else %}{% badge label "gray" %}{% endif %}
+      {% if not forloop.last %}<span class="muted">→</span>{% endif %}
+    {% endfor %}
+  </div>
+  <dl class="kv" style="margin-top:12px">
+    <dt>Создан</dt><dd>{{ protocol.created_at|local_dt }}{% if protocol.created_by %} · {{ protocol.created_by.short_name }}{% endif %}</dd>
+    {% if protocol.approval_started_at %}<dt>Согласование</dt><dd>с {{ protocol.approval_started_at|local_dt }} до {{ protocol.approval_deadline|date:"d.m.Y" }} включительно</dd>{% endif %}
+    {% for s in signatures %}<dt>Подпись: {{ s.get_role_display|lower }}</dt><dd>{{ s.full_name }} · {{ s.signed_at|local_dt }}{% if s.revoked_at %} · {% badge "отозвана" "red" %} {{ s.revoked_at|local_dt }}: {{ s.revoke_reason }}{% endif %}</dd>{% endfor %}
+    {% if protocol.signed_at %}<dt>Подписан</dt><dd>{{ protocol.signed_at|local_dt }}</dd>{% endif %}
+    {% if protocol.frozen_hash %}<dt>SHA-256 документа на подпись</dt><dd class="mono small">{{ protocol.frozen_hash }}</dd>{% endif %}
+    {% if protocol.signed_hash %}<dt>SHA-256 подписанного PDF</dt><dd class="mono small">{{ protocol.signed_hash }}</dd>{% endif %}
+  </dl>
+</div>
+
+{# ---------- панель действий ---------- #}
+{% if can_manage or my_approval or can_sign or can_return or can_annul or can_dissent %}
+<div class="card" id="actions">
+  <div class="card-head"><h2>Действия</h2></div>
+
+  {% if can_manage and protocol.status == 'draft' %}
+  <div class="actions">
+    <a class="btn" href="{% url 'protocols:edit' protocol.pk %}">Реквизиты</a>
+    <form class="inline" method="post" action="{% url 'protocols:item_add' protocol.pk %}">{% csrf_token %}<button class="btn" type="submit">+ Вопрос</button></form>
+    <form class="inline" method="post" action="{% url 'protocols:send_to_approval' protocol.pk %}">{% csrf_token %}
+      <button class="btn btn-primary" type="submit" data-confirm="Направить проект членам комиссии на согласование ({{ commission.approval_days }} раб. дн.)?"
+        {% if needs_deid and not protocol.patient_ids_confirmed %}disabled title="Подтвердите обезличивание"{% endif %}>Отправить на согласование{% if protocol.approvals.exists %} (новая редакция){% endif %}</button></form>
+  </div>
+  {% endif %}
+
+  {% if can_manage and protocol.status == 'approval' %}
+  <p>Ответили {{ answered_count }} из {{ approvals|length }}{% if waiting %}; нет ответа: {% for a in waiting %}{{ a.user.short_name }}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}. Срок — до {{ protocol.approval_deadline|date:"d.m.Y" }}; после срока протокол будет передан на подпись автоматически.</p>
+  <div class="actions">
+    <form class="inline" method="post" action="{% url 'protocols:move_to_signing' protocol.pk %}">{% csrf_token %}
+      <button class="btn btn-primary" type="submit" {% if waiting %}disabled title="Досрочно — только когда ответили все"{% endif %}
+        data-confirm="Сформировать итоговый документ и передать на подпись?">Передать на подпись досрочно</button></form>
+    <form class="inline" method="post" action="{% url 'protocols:new_revision' protocol.pk %}">{% csrf_token %}
+      <button class="btn" type="submit" data-confirm="Вернуть проект в черновик для подготовки новой редакции?">Подготовить новую редакцию</button></form>
+  </div>
+  {% endif %}
+
+  {% if my_approval %}
+  <div id="approval" style="margin-top:12px">
+    <h3>Ваш ответ по согласованию {% status_badge my_approval %}</h3>
+    {% if approval_open %}
+    <form method="post" action="{% url 'protocols:respond_approval' protocol.pk %}">{% csrf_token %}
+      {% include "partials/form.html" with form=response_form %}
+      <button class="btn btn-primary" type="submit">Отправить ответ</button>
+    </form>
+    <p class="muted small">Срок — до {{ protocol.approval_deadline|date:"d.m.Y" }}. Отсутствие ответа означает отсутствие замечаний.</p>
+    {% else %}<p class="muted">Срок согласования истёк.</p>{% endif %}
+  </div>
+  {% endif %}
+
+  {% if protocol.status == 'signing' %}
+  <div id="signing" style="margin-top:12px">
+    <h3>Подписание</h3>
+    <p>Порядок: секретарь, затем председатель. Сейчас подписывает: <b>{{ next_role_label|lower }}</b>{% if next_signer %} — {{ next_signer.full_name }}{% else %} <span class="badge badge-red">не назначен на дату протокола</span>{% endif %}.</p>
+    {% if can_sign %}
+    <p class="small">Вы подписываете документ с хэшем SHA-256 <span class="mono">{{ protocol.frozen_hash }}</span>. Перед подписью ознакомьтесь с <a href="{% url 'protocols:download_frozen' protocol.pk %}">PDF на подпись</a>.</p>
+    <div class="actions">
+      <form class="inline" method="post" action="{% url 'protocols:request_sign_code' protocol.pk %}">{% csrf_token %}<button class="btn" type="submit">Получить код на e-mail</button></form>
+      <form class="inline" method="post" action="{% url 'protocols:sign' protocol.pk %}">{% csrf_token %}
+        <input type="text" name="code" maxlength="6" inputmode="numeric" autocomplete="one-time-code" placeholder="Код из письма" required style="width:9em">
+        <button class="btn btn-primary" type="submit">Подписать</button></form>
+    </div>
+    {% endif %}
+    {% if can_return %}
+    <details style="margin-top:10px"><summary>Вернуть на доработку</summary>
+      <form method="post" action="{% url 'protocols:return_for_rework' protocol.pk %}">{% csrf_token %}
+        {% include "partials/form.html" with form=reason_form %}
+        <button class="btn btn-danger" type="submit" data-confirm="Вернуть протокол секретарю? Поставленные подписи будут отозваны.">Вернуть на доработку</button></form>
+    </details>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if can_annul %}
+  <details style="margin-top:10px"><summary>Аннулировать протокол</summary>
+    <form method="post" action="{% url 'protocols:annul' protocol.pk %}">{% csrf_token %}
+      {% include "partials/form.html" with form=reason_form %}
+      <button class="btn btn-danger" type="submit" data-confirm="Аннулировать подписанный протокол? Действие необратимо.">Аннулировать</button></form>
+  </details>
+  {% endif %}
+  {% if can_manage and protocol.status == 'annulled' %}
+  <form method="post" action="{% url 'protocols:create_replacement' protocol.pk %}" style="margin-top:10px">{% csrf_token %}
+    <button class="btn btn-primary" type="submit">Создать новый протокол взамен</button></form>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ---------- присутствие ---------- #}
+{% if quorum %}
+<div class="card">
+  <div class="card-head"><h2>Присутствие и кворум</h2>
+    {% if quorum.reached %}{% badge "кворум есть" "green" %}{% else %}{% badge "кворума нет" "red" %}{% endif %}</div>
+  <p>Присутствует {{ quorum.present }} из {{ quorum.total }}, требуется {{ quorum.needed }} ({{ commission.meeting_quorum_label }}).</p>
+  {% if attendance %}
+  <div class="table-wrap"><table class="table"><tbody>
+    {% for a in attendance %}<tr><td>{{ a.user.full_name }}{% if a.is_invited %} <span class="muted small">(приглашённый)</span>{% endif %}</td><td>{% status_badge a %}{% if a.reason %} <span class="small muted">{{ a.reason }}</span>{% endif %}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% endif %}
+  {% if protocol.meeting and member_view %}<p class="small"><a href="{% url 'meetings:detail' protocol.meeting_id %}">Карточка заседания →</a></p>{% endif %}
+</div>
+{% endif %}
+
+{% if protocol.preamble or protocol.place or protocol.format_text %}
+<div class="card"><dl class="kv">
+  {% if protocol.place %}<dt>Место</dt><dd>{{ protocol.place }}</dd>{% endif %}
+  {% if protocol.format_text %}<dt>Форма проведения</dt><dd>{{ protocol.format_text }}</dd>{% endif %}
+  {% if protocol.preamble %}<dt>Вступительная часть</dt><dd class="text-block">{{ protocol.preamble }}</dd>{% endif %}
+</dl></div>
+{% endif %}
+
+{# ---------- вопросы ---------- #}
+{% for item in items %}
+<div class="card" id="item-{{ item.pk }}">
+  <div class="card-head">
+    <h2>{{ item.position }}. {{ item.title }}{% if item.flagged_names %} <span title="Возможные ФИО">⚠</span>{% endif %}</h2>
+    {% if can_manage and protocol.status == 'draft' %}
+    <div class="actions">
+      <form class="inline" method="post" action="{% url 'protocols:item_move' item.pk %}">{% csrf_token %}<input type="hidden" name="direction" value="up"><button class="btn btn-sm btn-ghost" type="submit" aria-label="Выше" {% if forloop.first %}disabled{% endif %}>↑</button></form>
+      <form class="inline" method="post" action="{% url 'protocols:item_move' item.pk %}">{% csrf_token %}<input type="hidden" name="direction" value="down"><button class="btn btn-sm btn-ghost" type="submit" aria-label="Ниже" {% if forloop.last %}disabled{% endif %}>↓</button></form>
+      <a class="btn btn-sm" href="{% url 'protocols:item_edit' item.pk %}">Изменить</a>
+      <a class="btn btn-sm" href="{% url 'protocols:decision_add' item.pk %}">+ Решение</a>
+      <form class="inline" method="post" action="{% url 'protocols:item_delete' item.pk %}">{% csrf_token %}<button class="btn btn-sm btn-danger" type="submit" data-confirm="Удалить вопрос вместе с решениями и поручениями?">Удалить</button></form>
+    </div>
+    {% endif %}
+  </div>
+  {% if item.flagged_names and can_manage %}<div class="callout danger small">Возможные ФИО: {{ item.flagged_names|join:"; " }}</div>{% endif %}
+  {% if item.patient_id %}<p><span class="muted">ID пациента (МИС):</span> <b>{{ item.patient_id }}</b></p>{% endif %}
+  {% if item.heard %}<h3>Слушали</h3><div class="text-block">{{ item.heard }}</div>{% endif %}
+  {% if item.discussed %}<h3>Выступили</h3><div class="text-block">{{ item.discussed }}</div>{% endif %}
+  {% if item.resolved or item.decisions.all or item.dissent_note %}
+  <h3>Решили</h3>
+  {% if item.resolved %}<div class="text-block">{{ item.resolved }}</div>{% endif %}
+  {% for d in item.decisions.all %}
+  <div style="margin:8px 0 8px 0">
+    <b>{{ d.number|default:"—" }}</b> <span class="text-block">{{ d.text }}</span>
+    {% if can_manage and protocol.status == 'draft' %}
+      <a class="small" href="{% url 'protocols:decision_edit' d.pk %}">изменить</a> ·
+      <a class="small" href="{% url 'protocols:assignment_add' d.pk %}">+ поручение</a>
+    {% endif %}
+    {% with assignments=d.assignments.all %}{% if assignments %}
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th>Поручение</th><th>Ответственный</th><th>Срок</th><th>Статус</th></tr></thead><tbody>
+      {% for a in assignments %}
+      <tr class="{% if a.is_overdue and protocol.status == 'signed' %}row-danger{% endif %}">
+        <td>{% if protocol.status == 'draft' and can_manage %}<a href="{% url 'protocols:assignment_edit' a.pk %}">{{ a.text|truncatechars:160 }}</a>{% else %}<a href="{% url 'protocols:assignment_detail' a.pk %}">{{ a.text|truncatechars:160 }}</a>{% endif %}</td>
+        <td>{{ a.responsible_display }}{% for u in a.co_executors.all %}{% if forloop.first %}<div class="small muted">соисп.: {% endif %}{{ u.short_name }}{% if not forloop.last %}, {% else %}</div>{% endif %}{% endfor %}</td>
+        <td class="nowrap">{{ a.due_date|date:"d.m.Y" }}</td>
+        <td>{% if protocol.status == 'signed' and a.is_overdue %}{% status_badge a override="overdue" %}{% elif protocol.status == 'signed' or protocol.status == 'annulled' %}{% status_badge a %}{% else %}<span class="muted small">после подписания</span>{% endif %}</td>
+      </tr>{% endfor %}
+      </tbody></table></div>
+    {% endif %}{% endwith %}
+  </div>
+  {% endfor %}
+  {% if item.dissent_note %}<p><i>{{ item.dissent_note }}</i></p>{% endif %}
+  {% endif %}
+  {% if item.vote_summary %}<h3>Результаты голосования</h3><p>{{ item.vote_summary }}</p>{% endif %}
+  {% if item.active_dissents %}
+  <h3>Особые мнения</h3>
+  <ul class="list-plain">{% for d in item.active_dissents %}
+    <li><b>{{ d.author.full_name }}</b> <span class="muted small">подписано {{ d.signed_at|local_dt }}</span>
+      {% if d.text %}<div class="text-block">{{ d.text }}</div>{% endif %}
+      {% if d.file %}<a class="small" href="{% url 'protocols:dissent_file' d.pk %}">📎 {{ d.file_name }}</a>{% endif %}
+      <div class="small muted mono">SHA-256: {{ d.text_hash }}</div></li>
+  {% endfor %}</ul>
+  {% endif %}
+</div>
+{% empty %}
+<div class="card"><p class="empty">В протоколе пока нет вопросов.</p></div>
+{% endfor %}
+
+{# ---------- особое мнение ---------- #}
+{% if can_dissent or my_dissents %}
+<div class="card" id="dissent">
+  <div class="card-head"><h2>Особое мнение</h2></div>
+  {% if can_dissent %}
+  <p class="small">Особое мнение принимается только до {{ protocol.approval_deadline|date:"d.m.Y" }} включительно, подписывается сразу кодом из e-mail и включается в протокол отдельным разделом.</p>
+  <form method="post" action="{% url 'protocols:dissent_code' protocol.pk %}" style="margin-bottom:10px">{% csrf_token %}
+    <button class="btn" type="submit">1. Получить код подтверждения</button></form>
+  <form method="post" action="{% url 'protocols:dissent_add' protocol.pk %}" enctype="multipart/form-data">{% csrf_token %}
+    {% include "partials/form.html" with form=dissent_form %}
+    <button class="btn btn-primary" type="submit">2. Подписать и подать</button>
+  </form>
+  {% endif %}
+  {% if my_dissents %}
+  <h3>Мои особые мнения</h3>
+  <ul class="list-plain">{% for d in my_dissents %}
+    <li>По вопросу {{ d.item.position }} · {{ d.signed_at|local_dt }} — {{ d.text|truncatechars:120 }}
+      {% if approval_open %}<form class="inline" method="post" action="{% url 'protocols:dissent_withdraw' d.pk %}">{% csrf_token %}
+        <button class="btn btn-sm btn-danger" type="submit" data-confirm="Отозвать особое мнение?">Отозвать</button></form>{% endif %}</li>
+  {% endfor %}</ul>
+  {% endif %}
+</div>
+{% endif %}
+
+{# ---------- согласование ---------- #}
+{% if approvals or old_approvals %}
+<div class="card">
+  <div class="card-head"><h2>Согласование (редакция {{ protocol.revision }})</h2></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Член комиссии</th><th>Ответ</th><th>Замечания</th><th>Когда</th></tr></thead><tbody>
+    {% for a in approvals %}
+    <tr><td>{{ a.user.full_name }}</td><td>{% status_badge a %}</td>
+      <td>{% if a.item %}<span class="small muted">к вопросу {{ a.item.position }}:</span> {% endif %}<span class="text-block">{{ a.remarks }}</span></td>
+      <td class="nowrap">{{ a.responded_at|local_dt }}</td></tr>
+    {% endfor %}
+    </tbody></table></div>
+  {% if old_approvals %}
+  <details style="margin-top:10px"><summary>Ответы по предыдущим редакциям</summary>
+    <div class="table-wrap"><table class="table"><tbody>
+    {% for a in old_approvals %}<tr><td>ред. {{ a.revision }}</td><td>{{ a.user.full_name }}</td><td>{% status_badge a %}</td><td class="text-block">{{ a.remarks }}</td><td class="nowrap">{{ a.responded_at|local_dt }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </details>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if can_manage and dissents %}
+<div class="card">
+  <div class="card-head"><h2>Журнал особых мнений</h2></div>
+  <ul class="list-plain">{% for d in dissents %}
+    <li>Вопрос {{ d.item.position }} · {{ d.author.full_name }} · подписано {{ d.signed_at|local_dt }}{% if d.withdrawn_at %} · {% badge "отозвано" "gray" %} {{ d.withdrawn_at|local_dt }}{% endif %}</li>
+  {% endfor %}</ul>
+</div>
+{% endif %}
+{% endblock %}

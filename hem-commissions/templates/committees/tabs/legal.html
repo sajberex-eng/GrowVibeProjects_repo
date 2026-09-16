@@ -1,0 +1,50 @@
+{% load ui %}
+<div class="card">
+  <div class="card-head">
+    <h2>Нормативные правовые акты</h2>
+    {% if manage %}<div class="actions">
+      <form class="inline" method="post" action="{% url 'committees:legal_check_commission' commission.pk %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Проверить все сейчас</button></form>
+      <a class="btn btn-sm btn-primary" href="{% url 'committees:legal_act_add' commission.pk %}">+ НПА</a>
+    </div>{% endif %}
+  </div>
+  <p class="small"><span class="dot dot-{{ legal.color }}"></span>{{ legal.label }}{% if legal.checked %} · последняя проверка {{ legal.checked|local_dt }}{% endif %}</p>
+  {% if manage and not playwright %}<div class="callout small">Автоматическая проверка на adilet.zan.kz недоступна: не установлен Playwright. Результат проверки будет «Требует проверки» — сверьте статус вручную.</div>{% endif %}
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Статус</th><th>Акт</th><th>Орган</th><th>Проверка</th>{% if manage %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+    {% for a in acts %}
+    <tr class="{% if a.status == 'retired' %}row-muted{% elif a.status == 'lost_force' or a.status == 'unavailable' %}row-danger{% endif %}">
+      <td class="nowrap"><span class="dot dot-{{ a.dot }}"></span>{% status_badge a %}</td>
+      <td>{% if a.url %}<a href="{{ a.url }}" target="_blank" rel="noopener noreferrer">{{ a.title }}</a>{% else %}{{ a.title }}{% endif %}
+        <div class="small muted">{% if a.number %}{{ a.number }}{% endif %}{% if a.act_date %} от {{ a.act_date|date:"d.m.Y" }}{% endif %}{% if a.note %} · {{ a.note }}{% endif %}</div>
+        {% if a.replaced_by %}<div class="small">Заменён на: {{ a.replaced_by }}</div>{% endif %}</td>
+      <td class="small">{{ a.authority|default:"—" }}</td>
+      <td class="small nowrap"><a href="{% url 'committees:legal_act_log' commission.pk a.pk %}">{{ a.last_checked_at|local_dt }}</a></td>
+      {% if manage %}
+      <td class="nowrap">
+        <form class="inline" method="post" action="{% url 'committees:legal_act_check' commission.pk a.pk %}">{% csrf_token %}<button class="btn btn-sm" type="submit">Проверить</button></form>
+        <a class="btn btn-sm btn-ghost" href="{% url 'committees:legal_act_edit' commission.pk a.pk %}">Изменить</a>
+        {% if a.status != 'retired' and not a.replaced_by %}
+        <a class="btn btn-sm btn-ghost" href="{% url 'committees:legal_act_replace' commission.pk a.pk %}">Заменить</a>
+        <form class="inline" method="post" action="{% url 'committees:legal_act_retire' commission.pk a.pk %}">{% csrf_token %}<button class="btn btn-sm btn-danger" type="submit" data-confirm="Отметить: утратил силу, замена не требуется?">Замена не требуется</button></form>
+        {% endif %}
+      </td>
+      {% endif %}
+    </tr>
+    {% empty %}<tr><td colspan="5" class="empty">НПА не указаны.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+<div class="card">
+  <div class="card-head"><h2>Журнал проверок</h2></div>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Дата</th><th>Акт</th><th>Результат</th><th>Подробности</th><th>Вид</th></tr></thead>
+    <tbody>
+    {% for c in checks %}
+    <tr><td class="nowrap">{{ c.checked_at|local_dt }}</td><td class="small">{{ c.act.title|truncatechars:60 }}</td>
+      <td>{% status_badge c field="result" %}</td><td class="small">{{ c.details }}</td>
+      <td class="small">{% if c.manual %}внеплановая{% if c.initiated_by %} ({{ c.initiated_by.short_name }}){% endif %}{% else %}плановая{% endif %}</td></tr>
+    {% empty %}<tr><td colspan="5" class="empty">Проверок ещё не было.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>

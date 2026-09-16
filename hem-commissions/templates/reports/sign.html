@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Подписание отчёта{% endblock %}
+{% block content %}
+<div class="breadcrumbs"><a href="{% url 'reports:index' %}?{{ query }}">Отчёты</a></div>
+<div class="page-head"><div><h1>Подписание отчёта</h1>
+  <div class="sub">{{ commission.name }} · с {{ date_from|date:"d.m.Y" }} по {{ date_to|date:"d.m.Y" }}</div></div></div>
+<div class="card form-narrow">
+  <p>На ваш e-mail отправлен одноразовый код. Введите его, чтобы подписать отчёт простой электронной подписью.
+    В PDF будет добавлен штамп с вашим ФИО, датой и временем подписи и хэшем SHA-256 документа.</p>
+  <form method="post" action="{% url 'reports:sign' %}">{% csrf_token %}
+    <input type="hidden" name="commission" value="{{ commission.pk }}">
+    <input type="hidden" name="period" value="{{ params.period }}">
+    <input type="hidden" name="year" value="{{ params.year }}">
+    <input type="hidden" name="date_from" value="{{ date_from|date:'Y-m-d' }}">
+    <input type="hidden" name="date_to" value="{{ date_to|date:'Y-m-d' }}">
+    <input type="hidden" name="step" value="confirm">
+    {% include "partials/form.html" with form=code_form %}
+    <button class="btn btn-primary" type="submit">Подписать</button>
+    <a class="btn btn-ghost" href="{% url 'reports:index' %}?{{ query }}">Отмена</a>
+  </form>
+  <form method="post" action="{% url 'reports:sign' %}" style="margin-top:10px">{% csrf_token %}
+    <input type="hidden" name="commission" value="{{ commission.pk }}">
+    <input type="hidden" name="period" value="{{ params.period }}">
+    <input type="hidden" name="year" value="{{ params.year }}">
+    <input type="hidden" name="date_from" value="{{ date_from|date:'Y-m-d' }}">
+    <input type="hidden" name="date_to" value="{{ date_to|date:'Y-m-d' }}">
+    <input type="hidden" name="step" value="send">
+    <button class="btn btn-sm btn-ghost" type="submit">Отправить код повторно</button>
+  </form>
+</div>
+{% endblock %}

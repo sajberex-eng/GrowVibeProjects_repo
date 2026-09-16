@@ -1,0 +1,91 @@
+{% load ui %}
+<div class="card">
+  <div class="card-head">
+    <h2>{% if on %}Состав на {{ on|date:"d.m.Y" }}{% else %}Действующий состав{% endif %}</h2>
+    <form method="get" class="filters" style="margin:0">
+      <input type="hidden" name="tab" value="composition">
+      <div class="field"><label for="id_on">Состав на дату</label><input type="date" id="id_on" name="on" value="{{ on|date:'Y-m-d' }}"></div>
+      <button class="btn" type="submit">Показать</button>
+      {% if on %}<a class="btn btn-ghost" href="?tab=composition">Сегодня</a>{% endif %}
+    </form>
+  </div>
+  <p class="small muted">Основание (последний приказ о составе на дату):
+    {% if basis_order %}{% if basis_order.scan_file %}<a href="{% url 'committees:order_scan' commission.pk basis_order.pk %}">{{ basis_order }}</a>{% else %}{{ basis_order }}{% endif %}{% else %}—{% endif %}</p>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>ФИО</th><th>Роль</th><th>Должность</th><th>Город</th><th>В составе с</th><th>Приказ о включении</th></tr></thead>
+    <tbody>
+    {% for r in members %}
+    <tr><td>{{ r.user.full_name }}{% if not r.user.is_active %} {% badge "неактивен" "gray" %}{% endif %}</td>
+      <td>{{ r.get_role_display }}</td><td>{{ r.position_text|default:"—" }}</td><td>{{ r.city_text|default:"—" }}</td>
+      <td class="nowrap">{{ r.start_date|date:"d.m.Y" }}</td>
+      <td class="small">{{ r.start_order|default:"—" }}</td></tr>
+    {% empty %}<tr><td colspan="6" class="empty">На эту дату состав не утверждён.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2>Сравнение редакций состава</h2></div>
+  <form method="get" class="filters">
+    <input type="hidden" name="tab" value="composition">
+    <div class="field"><label for="id_a">Дата 1</label><input type="date" id="id_a" name="a" value="{{ diff_a|date:'Y-m-d' }}" required></div>
+    <div class="field"><label for="id_b">Дата 2</label><input type="date" id="id_b" name="b" value="{% if diff_b %}{{ diff_b|date:'Y-m-d' }}{% else %}{{ today|date:'Y-m-d' }}{% endif %}" required></div>
+    <button class="btn" type="submit">Сравнить</button>
+  </form>
+  {% if orders_changed_on %}<p class="small muted">Даты приказов: {% for o in orders_changed_on|slice:":8" %}{{ o.signed_on|date:"d.m.Y" }}{% if not forloop.last %}, {% endif %}{% endfor %}</p>{% endif %}
+  {% if diff %}
+  <p>Изменения с {{ diff_a|date:"d.m.Y" }} по {{ diff_b|date:"d.m.Y" }}:</p>
+  <div class="table-wrap"><table class="table">
+    <thead><tr><th>Изменение</th><th>ФИО</th><th>Было</th><th>Стало</th></tr></thead>
+    <tbody>
+    {% for r in diff.added %}<tr><td>{% badge "введён" "green" %}</td><td>{{ r.user.full_name }}</td><td>—</td><td>{{ r.get_role_display }}, {{ r.position_text }}</td></tr>{% endfor %}
+    {% for r in diff.removed %}<tr><td>{% badge "выведен" "red" %}</td><td>{{ r.user.full_name }}</td><td>{{ r.get_role_display }}, {{ r.position_text }}</td><td>—</td></tr>{% endfor %}
+    {% for old, new in diff.changed %}<tr><td>{% badge "изменён" "amber" %}</td><td>{{ new.user.full_name }}</td><td>{{ old.get_role_display }}, {{ old.position_text }}</td><td>{{ new.get_role_display }}, {{ new.position_text }}</td></tr>{% endfor %}
+    {% if not diff.added and not diff.removed and not diff.changed %}<tr><td colspan="4" class="empty">Состав не менялся.</td></tr>{% endif %}
+    </tbody>
+  </table></div>
+  <p class="small muted">Без изменений: {{ diff.same|length }} чел.</p>
+  {% endif %}
+</div>
+
+{% if manage %}
+<div class="card">
+  <div class="card-head"><h2>Проект состава</h2></div>
+  <p class="small muted">Изменения вступают в силу с даты подписания приказа. Отметьте изменения и сформируйте проект приказа.</p>
+  {% for c in pending %}
+  <form id="cancel-change-{{ c.pk }}" method="post" action="{% url 'committees:change_cancel' commission.pk c.pk %}">{% csrf_token %}</form>
+  {% endfor %}
+  <form method="post" action="{% url 'committees:order_create' commission.pk %}">{% csrf_token %}
+    <div class="table-wrap"><table class="table">
+      <thead><tr><th></th><th>Изменение</th><th>Сотрудник</th><th>Роль / должность</th><th>Основание</th><th>Приказ</th><th></th></tr></thead>
+      <tbody>
+      {% for c in pending %}
+      <tr>
+        <td>{% if not c.order or c.order.status == 'cancelled' %}<input type="checkbox" name="changes" value="{{ c.pk }}" checked aria-label="Включить в приказ">{% endif %}</td>
+        <td>{{ c.get_action_display }}</td>
+        <td>{{ c.user.full_name }}</td>
+        <td>{% if c.new_role %}{{ c.get_new_role_display }}{% endif %}{% if c.new_role and c.new_position %}, {% endif %}{{ c.new_position }}</td>
+        <td class="small">{{ c.basis|default:"—" }}</td>
+        <td class="small">{% if c.order and c.order.status == 'draft' %}<a href="?tab=orders">проект приказа</a>{% else %}—{% endif %}</td>
+        <td><button class="btn btn-sm btn-danger" type="submit" form="cancel-change-{{ c.pk }}" data-confirm="Отменить это изменение?">Отменить</button></td>
+      </tr>
+      {% empty %}<tr><td colspan="7" class="empty">Нет изменений в проекте.</td></tr>{% endfor %}
+      </tbody>
+    </table></div>
+    {% if pending %}
+    <h3 style="margin-top:14px">Сформировать проект приказа</h3>
+    {% include "partials/form.html" with form=order_form %}
+    <button class="btn btn-primary" type="submit">Сформировать проект приказа (DOCX)</button>
+    {% endif %}
+  </form>
+</div>
+
+<div class="card form-narrow">
+  <div class="card-head"><h2>Добавить изменение в проект</h2></div>
+  <form method="post" action="{% url 'committees:change_add' commission.pk %}">{% csrf_token %}
+    {% include "partials/form.html" with form=change_form %}
+    <p class="small muted">«Роль» — для ввода в состав (по умолчанию «член комиссии») и смены роли; «Новая должность» — для изменения должности. Председатель и секретарь — по одному: при замене добавьте в тот же приказ изменение по действующему.</p>
+    <button class="btn btn-primary" type="submit">Добавить</button>
+  </form>
+</div>
+{% endif %}
